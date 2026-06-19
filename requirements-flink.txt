@@ -1,0 +1,5 @@
+# PyFlink requires Java 11 or 17 to be installed on the system.
+# Install Java first: brew install openjdk@11
+# Then: pip install -r requirements-flink.txt
+
+apache-flink==1.19.0

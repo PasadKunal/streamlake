@@ -1,0 +1,197 @@
+version: "3.9"
+
+# StreamLake Local Development Stack
+# Services added per phase:
+#   Phase 0: MinIO, Redis, PostgreSQL, Grafana, Prometheus
+#   Phase 1: Redpanda (added in feat/phase-1-ingestion branch)
+#   Phase 2: Flink JobManager + TaskManager
+#   Phase 3: Airflow, Superset
+#   Phase 5: MLflow
+
+networks:
+  streamlake:
+    driver: bridge
+
+volumes:
+  minio_data:
+  redis_data:
+  postgres_data:
+  grafana_data:
+  prometheus_data:
+
+services:
+
+  # ── Object Storage (local S3 for Delta Lake) ───────────────────────
+  minio:
+    image: minio/minio:RELEASE.2024-04-06T05-26-02Z
+    container_name: streamlake-minio
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web console
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - streamlake
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Creates the default bucket on startup
+  minio-init:
+    image: minio/mc:RELEASE.2024-04-06T16-17-45Z
+    container_name: streamlake-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - streamlake
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin};
+      mc mb --ignore-existing local/streamlake-bronze;
+      mc mb --ignore-existing local/streamlake-silver;
+      mc mb --ignore-existing local/streamlake-gold;
+      mc mb --ignore-existing local/streamlake-features;
+      mc mb --ignore-existing local/streamlake-mlflow;
+      echo 'Buckets created.';
+      "
+
+  # ── Online Feature Store ───────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: streamlake-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - streamlake
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── Metadata / A/B results / Lineage store ─────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: streamlake-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-streamlake}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-streamlake}
+      POSTGRES_DB: ${POSTGRES_DB:-streamlake}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - streamlake
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U streamlake"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Monitoring ─────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    container_name: streamlake-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - streamlake
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: streamlake-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+    networks:
+      - streamlake
+    depends_on:
+      - prometheus
+
+  # ── Phase 1: Redpanda (uncomment when starting Phase 1) ───────────
+  # redpanda:
+  #   image: redpandadata/redpanda:v23.3.11
+  #   container_name: streamlake-redpanda
+  #   ports:
+  #     - "9092:9092"   # Kafka API
+  #     - "8081:8081"   # Schema Registry
+  #     - "8082:8082"   # REST Proxy
+  #     - "9644:9644"   # Admin API
+  #   networks:
+  #     - streamlake
+  #   command:
+  #     - redpanda start
+  #     - --smp 1
+  #     - --memory 1G
+  #     - --overprovisioned
+  #     - --kafka-addr 0.0.0.0:9092
+  #     - --advertise-kafka-addr localhost:9092
+  #     - --schema-registry-addr 0.0.0.0:8081
+
+  # ── Phase 2: Flink (uncomment when starting Phase 2) ──────────────
+  # flink-jobmanager:
+  #   image: flink:1.19-scala_2.12-java11
+  #   container_name: streamlake-flink-jm
+  #   ports:
+  #     - "8083:8081"   # Flink Web UI
+  #   command: jobmanager
+  #   environment:
+  #     FLINK_PROPERTIES: "jobmanager.rpc.address: flink-jobmanager"
+  #   networks:
+  #     - streamlake
+  #
+  # flink-taskmanager:
+  #   image: flink:1.19-scala_2.12-java11
+  #   container_name: streamlake-flink-tm
+  #   depends_on:
+  #     - flink-jobmanager
+  #   command: taskmanager
+  #   environment:
+  #     FLINK_PROPERTIES: "jobmanager.rpc.address: flink-jobmanager\ntaskmanager.numberOfTaskSlots: 4"
+  #   networks:
+  #     - streamlake
+
+  # ── Phase 5: MLflow (uncomment when starting Phase 5) ─────────────
+  # mlflow:
+  #   image: ghcr.io/mlflow/mlflow:v2.12.2
+  #   container_name: streamlake-mlflow
+  #   ports:
+  #     - "5000:5000"
+  #   environment:
+  #     MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+  #     AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+  #     AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+  #   command: >
+  #     mlflow server
+  #     --backend-store-uri postgresql://streamlake:streamlake@postgres:5432/streamlake
+  #     --default-artifact-root s3://streamlake-mlflow
+  #     --host 0.0.0.0
+  #   depends_on:
+  #     - postgres
+  #     - minio
+  #   networks:
+  #     - streamlake
