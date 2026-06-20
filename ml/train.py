@@ -12,7 +12,9 @@ Usage:
 """
 from __future__ import annotations
 
+import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 import mlflow
@@ -122,6 +124,26 @@ def train(run_name: str = "xgb-churn-v1") -> str:
 
         # SHAP summary logged as artifact
         log_shap_summary(model, X_test, run)
+
+        # Save training baseline for PSI drift detection (Phase 6)
+        baseline = {
+            "computed_at": datetime.now(timezone.utc).isoformat(),
+            "n_samples":   len(X_train),
+            "features":    {},
+        }
+        for feat in FEATURE_COLS:
+            vals = X_train[feat].values.astype(float)
+            counts, edges = np.histogram(vals, bins=10)
+            baseline["features"][feat] = {
+                "bin_edges":  edges.tolist(),
+                "bin_counts": counts.tolist(),
+                "mean": round(float(vals.mean()), 6),
+                "std":  round(float(vals.std()),  6),
+                "p50":  round(float(np.median(vals)), 6),
+            }
+        baseline_path = Path("serving/training_baseline.json")
+        baseline_path.write_text(json.dumps(baseline, indent=2))
+        mlflow.log_artifact(str(baseline_path), "baseline")
 
         # Register model in MLflow Model Registry
         mlflow.xgboost.log_model(

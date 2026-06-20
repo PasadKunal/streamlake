@@ -3,9 +3,10 @@ FastAPI churn prediction inference endpoint.
 
 Endpoints:
   GET  /health              — liveness probe
+  GET  /metrics             — Prometheus metrics (scraped by Prometheus on port 9090)
   GET  /model/info          — MLflow model metadata
   GET  /features/{user_id}  — raw feature values from Redis
-  POST /predict             — churn probability + SHAP explanation
+  POST /predict             — churn probability + SHAP explanation + Prometheus instrumentation
 
 The server loads the XGBoost model from MLflow at startup.
 Features are retrieved from the Feast Redis online store (< 10ms).
@@ -21,18 +22,25 @@ Test:
 """
 from __future__ import annotations
 
+import time
 import os
 from pathlib import Path
 
 import mlflow.xgboost
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel
+from starlette.responses import Response
 
 from feature_store.offline_store import FEATURE_REFS, get_online_features
 from ml.ab_splitter import assign as ab_assign
 from ml.shap_explainer import explain_prediction
 from ml.train import EXPERIMENT, FEATURE_COLS, MODEL_NAME, MLFLOW_URI
+from serving.metrics import (
+    CHURN_PROBABILITY, DRIFT_ALERT, FEATURE_PSI,
+    PREDICTION_LATENCY, PREDICTIONS_TOTAL,
+)
 
 app = FastAPI(
     title="StreamLake Churn Prediction API",
@@ -68,6 +76,16 @@ def load_models() -> None:
                                          if len(sorted_versions) >= 2 else sorted_versions[-1].version
         print(f"Models loaded — champion v{_models['_champion_version']}, "
               f"challenger v{_models['_challenger_version']}")
+
+        # Push initial PSI scores to Prometheus
+        try:
+            from serving.drift_monitor import compute_drift_report, push_psi_to_prometheus
+            report = compute_drift_report()
+            push_psi_to_prometheus(report)
+            print(f"Drift monitor initialised — alert={report['drift_alert']}")
+        except Exception as drift_err:
+            print(f"Drift monitor skipped: {drift_err}")
+
     except Exception as e:
         print(f"WARNING: Could not load models from registry ({e}). "
               f"Run python -m ml.train first.")
@@ -96,6 +114,12 @@ class PredictResponse(BaseModel):
 
 
 # ── Endpoints ─────────────────────────────────────────────
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    """Prometheus metrics scrape endpoint."""
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 
 @app.get("/health")
 def health():
@@ -170,12 +194,23 @@ def predict(request: PredictRequest):
             X[col] = 0
         X = X[FEATURE_COLS]
 
-    # Inference
+    # Inference + latency tracking
+    t0         = time.perf_counter()
     prob       = float(model.predict_proba(X)[0][1])
     prediction = prob >= 0.5
 
     # SHAP explanation
     top_features = explain_prediction(model, X)
+    latency = time.perf_counter() - t0
+
+    # Prometheus instrumentation
+    PREDICTIONS_TOTAL.labels(
+        model_version=model_version,
+        ab_group=ab_group,
+        prediction=str(prediction),
+    ).inc()
+    PREDICTION_LATENCY.observe(latency)
+    CHURN_PROBABILITY.observe(prob)
 
     return PredictResponse(
         user_id=request.user_id,
