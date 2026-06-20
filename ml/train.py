@@ -53,15 +53,68 @@ FEATURE_COLS = [
 ]
 
 
+OLIST_ORDERS_PATH    = Path("data/olist/olist_orders_dataset.csv")
+OLIST_CUSTOMERS_PATH = Path("data/olist/olist_customers_dataset.csv")
+
+
+def _olist_churn_labels() -> pd.Series | None:
+    """
+    Derive real churn labels from Olist purchase history.
+
+    A customer who only ever bought once is labelled churned=1.
+    A customer who bought two or more times is labelled churned=0.
+
+    Returns a Series indexed by customer_unique_id, or None if the
+    Olist CSVs are not present (falls back to synthetic label below).
+    """
+    if not (OLIST_ORDERS_PATH.exists() and OLIST_CUSTOMERS_PATH.exists()):
+        return None
+
+    orders    = pd.read_csv(OLIST_ORDERS_PATH)
+    customers = pd.read_csv(OLIST_CUSTOMERS_PATH)
+
+    # Filter to delivered orders only
+    orders = orders[orders["order_status"] == "delivered"]
+
+    # Attach customer_unique_id
+    orders = orders.merge(
+        customers[["customer_id", "customer_unique_id"]],
+        on="customer_id", how="left",
+    )
+
+    purchase_counts = (
+        orders.groupby("customer_unique_id")["order_id"]
+        .count()
+        .rename("purchase_count")
+    )
+
+    # Churn = only ever bought once (never came back)
+    labels = (purchase_counts == 1).astype(int)
+    labels.index.name = "user_id"
+    return labels
+
+
 def build_training_data() -> tuple[pd.DataFrame, pd.Series]:
     """Load Phase 4 features and derive churn label."""
     df = pd.read_parquet(PARQUET_PATH)
 
-    # Churn = not purchased in the last 7 days.
-    # 999 is the sentinel for users who have never purchased at all.
-    # Both cases are churn: a never-buyer and a lapsed buyer are equally
-    # unlikely to convert in the near term.
-    y = (df["days_since_last_purchase"] > 7).astype(int)
+    olist_labels = _olist_churn_labels()
+
+    if olist_labels is not None:
+        # Real Olist data path: join on user_id (= customer_unique_id in Olist).
+        # Only keep rows that have a real label; synthetic users (USER-XXXXXX)
+        # won't appear in Olist and are dropped from training.
+        df = df.set_index("user_id")
+        df = df.join(olist_labels, how="inner")
+        y = df.pop("purchase_count")
+        df = df.reset_index(drop=True)
+        print(f"  Olist label: {int(y.sum()):,} churned / {int((y==0).sum()):,} retained "
+              f"(churn rate {y.mean():.1%})")
+    else:
+        # Synthetic data fallback: use recency threshold.
+        # days_since_last_purchase is excluded from FEATURE_COLS above to
+        # avoid circular leakage when this branch is active.
+        y = (df["days_since_last_purchase"] > 7).astype(int)
 
     return df[FEATURE_COLS].copy(), y
 

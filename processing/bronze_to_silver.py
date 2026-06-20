@@ -113,8 +113,12 @@ def run_once(batch_size: int = 2000) -> dict:
         new_dt = dt.load_with_datetime(dt.history()[0]["timestamp"].isoformat()) if hasattr(dt.history()[0]["timestamp"], "isoformat") else dt
         df = new_dt.to_pandas()
 
+    # Sort by event time so the watermark advances monotonically.
+    # Without this, a single out-of-order record with a recent timestamp
+    # causes the watermark to jump forward and discard all earlier events.
+    df = df.sort_values("timestamp_ms", ascending=True)
     records = df.to_dict(orient="records")
-    logger.info(f"Loaded {len(records):,} records from Bronze")
+    logger.info(f"Loaded {len(records):,} records from Bronze (sorted by event time)")
 
     watermark = WatermarkTracker(config=DEFAULT_WATERMARK_CONFIG)
     deduplicator = EventDeduplicator()
