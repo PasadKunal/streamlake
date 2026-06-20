@@ -110,7 +110,7 @@ A production-grade, self-hosted data platform that unifies real-time event inges
 ## Build Phases
 
 - [x] **Phase 0** — Repo setup, folder structure, Docker Compose skeleton, environment
-- [ ] **Phase 1** — Event ingestion: Redpanda → Avro Schema Registry → Bronze Delta Lake
+- [x] **Phase 1** — Event ingestion: Redpanda → Avro Schema Registry → Bronze Delta Lake
 - [ ] **Phase 2** — Bronze → Silver: PyFlink streaming job, Great Expectations, quarantine routing
 - [ ] **Phase 3** — Silver → Gold: Airflow DAGs, DuckDB aggregations, Superset BI dashboard
 - [ ] **Phase 4** — ML Feature Store: Feast + Flink rolling windows + Redis + Delta offline
@@ -189,6 +189,69 @@ This starts: MinIO, Redis, PostgreSQL, Grafana, Prometheus.
 | Grafana | http://localhost:3000 | admin / admin |
 | Redis | localhost:6379 | — |
 | PostgreSQL | localhost:5432 | streamlake / streamlake |
+
+---
+
+---
+
+## Phase 1 — Event Ingestion
+
+**Branch:** `feat/phase-1-ingestion`
+
+### What was built
+
+| File | Purpose |
+|------|---------|
+| [ingestion/avro_schemas/user_event.avsc](ingestion/avro_schemas/user_event.avsc) | Avro schema — 11 fields covering all event types with null-safe unions |
+| [ingestion/schema_registry.py](ingestion/schema_registry.py) | Schema registration, AvroSerializer / AvroDeserializer factory |
+| [ingestion/kafka_setup.py](ingestion/kafka_setup.py) | One-time topic creation (4 partitions, 7-day retention, lz4 compression) |
+| [ingestion/kafka_producer.py](ingestion/kafka_producer.py) | Event simulator — 6 event types, realistic distribution, 2% late events |
+| [ingestion/kafka_to_bronze.py](ingestion/kafka_to_bronze.py) | Kafka consumer → Bronze Delta writer, manual offset commit post-write |
+| [storage/bronze_schema.py](storage/bronze_schema.py) | PyArrow schema for the Bronze table (event fields + ingestion metadata) |
+| [storage/delta_writer.py](storage/delta_writer.py) | Delta write utility with retry logic, MinIO/S3 storage options |
+
+### Running Phase 1 locally
+
+**1. Start infrastructure**
+```bash
+docker compose up -d
+```
+
+**2. Create the Kafka topic**
+```bash
+source .venv/bin/activate
+python -m ingestion.kafka_setup
+```
+
+**3. Register the Avro schema**
+```bash
+python -c "
+from ingestion.schema_registry import register_all_schemas
+register_all_schemas('http://localhost:8081')
+"
+```
+
+**4. Start the event producer** (terminal 1)
+```bash
+python -m ingestion.kafka_producer --rate 1400
+```
+
+**5. Start the Bronze writer** (terminal 2)
+```bash
+python -m ingestion.kafka_to_bronze \
+  --table-path s3://streamlake-bronze/events \
+  --batch-size 500 \
+  --batch-timeout 10
+```
+
+**6. Verify Bronze table in MinIO**
+
+Open [http://localhost:9001](http://localhost:9001) → bucket `streamlake-bronze` → you should see Parquet files in `events/ingestion_date=YYYY-MM-DD/` directories.
+
+### Running tests
+```bash
+pytest tests/ -v
+```
 
 ---
 

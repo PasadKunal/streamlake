@@ -1,0 +1,74 @@
+{
+  "type": "record",
+  "name": "UserEvent",
+  "namespace": "com.streamlake.events",
+  "doc": "Unified user event schema for StreamLake Bronze layer ingestion",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "doc": "UUID v4 — unique per event, used for deduplication in Silver layer"
+    },
+    {
+      "name": "event_type",
+      "type": {
+        "type": "enum",
+        "name": "EventType",
+        "symbols": ["CLICK", "PAGE_VIEW", "PURCHASE", "SESSION_START", "SESSION_END", "ADD_TO_CART"]
+      },
+      "doc": "Type of user interaction"
+    },
+    {
+      "name": "user_id",
+      "type": "string",
+      "doc": "Anonymized user identifier"
+    },
+    {
+      "name": "session_id",
+      "type": "string",
+      "doc": "Session identifier — groups events within a single visit"
+    },
+    {
+      "name": "timestamp_ms",
+      "type": "long",
+      "doc": "Event timestamp in milliseconds since epoch (event time, not processing time)"
+    },
+    {
+      "name": "page_url",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "URL of the page where the event occurred"
+    },
+    {
+      "name": "product_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Product identifier for PURCHASE and ADD_TO_CART events"
+    },
+    {
+      "name": "amount_cents",
+      "type": ["null", "long"],
+      "default": null,
+      "doc": "Transaction amount in cents for PURCHASE events"
+    },
+    {
+      "name": "device_type",
+      "type": {
+        "type": "enum",
+        "name": "DeviceType",
+        "symbols": ["DESKTOP", "MOBILE", "TABLET", "UNKNOWN"]
+      },
+      "doc": "Device category"
+    },
+    {
+      "name": "country_code",
+      "type": "string",
+      "doc": "ISO 3166-1 alpha-2 country code"
+    },
+    {
+      "name": "app_version",
+      "type": "string",
+      "doc": "Application version that generated this event"
+    }
+  ]
+}
