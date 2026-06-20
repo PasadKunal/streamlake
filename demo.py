@@ -33,7 +33,6 @@ CHART_LAYOUT = dict(
     plot_bgcolor="rgba(0,0,0,0)",
     font=dict(family="Inter, sans-serif", color="#a0aec0", size=12),
     margin=dict(t=20, b=20, l=10, r=10),
-    height=320,
 )
 PURPLE = "#8b5cf6"
 TEAL   = "#00d4aa"
