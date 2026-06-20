@@ -2,9 +2,15 @@
 XGBoost churn model training with MLflow tracking.
 
 Label definition:
-  churn = 1 → user never purchased (days_since_last_purchase == 999)
-              AND low engagement (session_count_24h <= 1)
-  churn = 0 → purchased recently OR high-engagement session activity
+  churn = 1 → user has not purchased in the last 7 days
+              (days_since_last_purchase > 7, or 999 meaning never purchased)
+  churn = 0 → purchased within the last 7 days
+
+  With synthetic data: the 999 sentinel (never purchased) drives most churn labels.
+  With Olist data:     every user has purchased, so the 7-day recency threshold
+                       separates one-time/lapsed buyers from repeat buyers.
+  The threshold is intentionally kept the same so the same model works with
+  both data sources without code changes.
 
 Usage:
     source .venv/bin/activate
@@ -51,12 +57,11 @@ def build_training_data() -> tuple[pd.DataFrame, pd.Series]:
     """Load Phase 4 features and derive churn label."""
     df = pd.read_parquet(PARQUET_PATH)
 
-    # Churn = never purchased AND low engagement
-    # days_since_last_purchase == 999 means the user never purchased
-    y = (
-        (df["days_since_last_purchase"] == 999) &
-        (df["session_count_24h"] <= 1)
-    ).astype(int)
+    # Churn = not purchased in the last 7 days.
+    # 999 is the sentinel for users who have never purchased at all.
+    # Both cases are churn: a never-buyer and a lapsed buyer are equally
+    # unlikely to convert in the near term.
+    y = (df["days_since_last_purchase"] > 7).astype(int)
 
     return df[FEATURE_COLS].copy(), y
 

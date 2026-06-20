@@ -59,8 +59,11 @@ webserver_config.py
 credentials.json
 service_account.json
 
-# Local data
-data/
+# Local data (CSVs are large; keep directory stubs via .gitkeep)
+data/*
+!data/olist/
+data/olist/*
+!data/olist/.gitkeep
 tmp/
 temp/
 
