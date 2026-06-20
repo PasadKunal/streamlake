@@ -17,13 +17,20 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-API_URL = os.getenv("API_URL", "http://localhost:8000")
+def _secret(key: str, default: str = "") -> str:
+    """Read from Streamlit Cloud secrets first, then env vars, then default."""
+    try:
+        return st.secrets[key]
+    except Exception:
+        return os.getenv(key, default)
 
-_endpoint = os.getenv("AWS_ENDPOINT_URL")
+API_URL = _secret("API_URL", "http://localhost:8000")
+
+_endpoint = _secret("AWS_ENDPOINT_URL", os.getenv("AWS_ENDPOINT_URL", ""))
 STORAGE_OPTIONS: dict = {
-    "AWS_ACCESS_KEY_ID":          os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
-    "AWS_SECRET_ACCESS_KEY":      os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
-    "AWS_REGION":                 os.getenv("AWS_DEFAULT_REGION", "us-east-1"),
+    "AWS_ACCESS_KEY_ID":          _secret("AWS_ACCESS_KEY_ID", "minioadmin"),
+    "AWS_SECRET_ACCESS_KEY":      _secret("AWS_SECRET_ACCESS_KEY", "minioadmin"),
+    "AWS_REGION":                 _secret("AWS_DEFAULT_REGION", "us-east-1"),
     "AWS_S3_ALLOW_UNSAFE_RENAME": "true",
 }
 if _endpoint:
