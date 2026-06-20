@@ -214,7 +214,7 @@ def load_delta(path: str) -> pd.DataFrame:
 def load_features() -> pd.DataFrame:
     return pd.read_parquet("feature_store/data/user_features.parquet")
 
-def check_svc(url: str, timeout: float = 1.5) -> bool:
+def check_svc(url: str, timeout: float = 5.0) -> bool:
     try:
         requests.get(url, timeout=timeout)
         return True
@@ -517,35 +517,34 @@ SHAP shows which features drove the score.
         go_btn  = True
 
     if go_btn:
-        if not api_ok:
-            st.error("API is not running. Start it with:\n```\nuvicorn serving.app:app --port 8000\n```")
+        with st.spinner("Fetching features and running model (first request may take ~30s to wake API)..."):
+            try:
+                resp = requests.post(
+                    f"{API_URL}/predict", json={"user_id": user_id}, timeout=60
+                )
+            except requests.exceptions.ConnectionError:
+                st.error(f"Cannot connect to API at {API_URL}. Check that RENDER is running.")
+                st.stop()
+            except requests.exceptions.Timeout:
+                st.error("API timed out after 60s. The Render free tier may be overloaded — try again.")
+                st.stop()
+        if resp.status_code == 404:
+            st.warning(f"User `{user_id}` not in feature store.")
+        elif resp.status_code != 200:
+            st.error(f"API returned {resp.status_code}: {resp.json().get('detail', 'unknown')}")
         else:
-            with st.spinner("Fetching features and running model..."):
-                try:
-                    resp = requests.post(
-                        f"{API_URL}/predict", json={"user_id": user_id}, timeout=15
-                    )
-                except requests.exceptions.ConnectionError:
-                    st.error("Lost connection to API.")
-                    st.stop()
+            data = resp.json()
+            prob = data["churn_probability"]
 
-            if resp.status_code == 404:
-                st.warning(f"User `{user_id}` not in feature store.")
-            elif resp.status_code != 200:
-                st.error(f"API returned {resp.status_code}: {resp.json().get('detail', 'unknown')}")
-            else:
-                data = resp.json()
-                prob = data["churn_probability"]
+            st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-                st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+            r1, r2, r3 = st.columns([1.2, 2.2, 2.2])
 
-                r1, r2, r3 = st.columns([1.2, 2.2, 2.2])
-
-                with r1:
-                    cls        = "prob-high" if prob >= 0.5 else "prob-low"
-                    badge_cls  = "pred-high" if prob >= 0.5 else "pred-low"
-                    badge_text = "HIGH RISK" if prob >= 0.5 else "LOW RISK"
-                    st.markdown(f"""
+            with r1:
+                cls        = "prob-high" if prob >= 0.5 else "prob-low"
+                badge_cls  = "pred-high" if prob >= 0.5 else "pred-low"
+                badge_text = "HIGH RISK" if prob >= 0.5 else "LOW RISK"
+                st.markdown(f"""
 <div class="pred-card">
   <div class="prob-lbl">Churn Probability</div>
   <div class="prob-num {cls}">{prob:.0%}</div>
@@ -563,81 +562,81 @@ SHAP shows which features drove the score.
 </div>
 """, unsafe_allow_html=True)
 
-                with r2:
-                    st.markdown("**SHAP feature contributions**")
-                    st.caption("Positive value = pushes toward churn. Negative = away from churn.")
-                    shap_df = pd.DataFrame(data["top_features"])
-                    colors  = [
-                        "#ef4444" if d == "increases_churn" else "#00d4aa"
-                        for d in shap_df["direction"]
-                    ]
-                    fig = go.Figure(go.Bar(
-                        x=shap_df["shap_value"],
-                        y=shap_df["feature"],
-                        orientation="h",
-                        marker_color=colors,
-                        marker_line_width=0,
-                        text=[f"{v:+.3f}" for v in shap_df["shap_value"]],
-                        textposition="outside",
-                        textfont=dict(color="#a0aec0", size=11),
-                    ))
-                    fig.update_layout(
-                        **CHART_LAYOUT, height=200,
-                        xaxis_title="SHAP value",
-                        yaxis={"autorange": "reversed", "tickfont": {"size": 11}},
-                        xaxis={"zeroline": True, "zerolinecolor": "rgba(139,92,246,0.3)"},
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-
-                with r3:
-                    st.markdown("**Feature values (from Redis)**")
-                    st.caption("9 rolling-window features computed over the last 1h, 24h, and 7d.")
-                    feat = data["features_used"]
-                    rows = [
-                        {
-                            "Feature": k,
-                            "Value": f"{int(v):,}" if isinstance(v, (int, float)) else v,
-                        }
-                        for k, v in feat.items()
-                    ]
-                    st.dataframe(pd.DataFrame(rows), hide_index=True,
-                                 use_container_width=True, height=220)
-
-                st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-                fig_g = go.Figure(go.Indicator(
-                    mode="gauge+number+delta",
-                    value=prob * 100,
-                    number={
-                        "suffix": "%",
-                        "font": {"size": 48, "color": "#ef4444" if prob >= 0.5 else "#00d4aa"},
-                    },
-                    delta={
-                        "reference": 50, "suffix": "% vs threshold",
-                        "font": {"size": 14},
-                        "decreasing": {"color": "#00d4aa"},
-                        "increasing": {"color": "#ef4444"},
-                    },
-                    gauge={
-                        "axis":  {"range": [0, 100], "tickcolor": "#475569", "tickwidth": 1},
-                        "bar":   {"color": "#ef4444" if prob >= 0.5 else "#00d4aa", "thickness": 0.25},
-                        "bgcolor": "rgba(0,0,0,0)",
-                        "bordercolor": "rgba(139,92,246,0.2)",
-                        "steps": [
-                            {"range": [0, 30],   "color": "rgba(0,212,170,0.08)"},
-                            {"range": [30, 60],  "color": "rgba(251,191,36,0.06)"},
-                            {"range": [60, 100], "color": "rgba(239,68,68,0.08)"},
-                        ],
-                        "threshold": {"line": {"color": "#8b5cf6", "width": 2}, "value": 50},
-                    },
-                    title={"text": f"Risk score for {user_id}",
-                           "font": {"color": "#64748b", "size": 13}},
+            with r2:
+                st.markdown("**SHAP feature contributions**")
+                st.caption("Positive value = pushes toward churn. Negative = away from churn.")
+                shap_df = pd.DataFrame(data["top_features"])
+                colors  = [
+                    "#ef4444" if d == "increases_churn" else "#00d4aa"
+                    for d in shap_df["direction"]
+                ]
+                fig = go.Figure(go.Bar(
+                    x=shap_df["shap_value"],
+                    y=shap_df["feature"],
+                    orientation="h",
+                    marker_color=colors,
+                    marker_line_width=0,
+                    text=[f"{v:+.3f}" for v in shap_df["shap_value"]],
+                    textposition="outside",
+                    textfont=dict(color="#a0aec0", size=11),
                 ))
-                fig_g.update_layout(
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    font=dict(family="Inter", color="#a0aec0"),
-                    height=250, margin=dict(t=40, b=0, l=30, r=30),
+                fig.update_layout(
+                    **CHART_LAYOUT, height=200,
+                    xaxis_title="SHAP value",
+                    yaxis={"autorange": "reversed", "tickfont": {"size": 11}},
+                    xaxis={"zeroline": True, "zerolinecolor": "rgba(139,92,246,0.3)"},
                 )
-                st.plotly_chart(fig_g, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True)
+
+            with r3:
+                st.markdown("**Feature values (from Redis)**")
+                st.caption("9 rolling-window features computed over the last 1h, 24h, and 7d.")
+                feat = data["features_used"]
+                rows = [
+                    {
+                        "Feature": k,
+                        "Value": f"{int(v):,}" if isinstance(v, (int, float)) else v,
+                    }
+                    for k, v in feat.items()
+                ]
+                st.dataframe(pd.DataFrame(rows), hide_index=True,
+                             use_container_width=True, height=220)
+
+            st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+            fig_g = go.Figure(go.Indicator(
+                mode="gauge+number+delta",
+                value=prob * 100,
+                number={
+                    "suffix": "%",
+                    "font": {"size": 48, "color": "#ef4444" if prob >= 0.5 else "#00d4aa"},
+                },
+                delta={
+                    "reference": 50, "suffix": "% vs threshold",
+                    "font": {"size": 14},
+                    "decreasing": {"color": "#00d4aa"},
+                    "increasing": {"color": "#ef4444"},
+                },
+                gauge={
+                    "axis":  {"range": [0, 100], "tickcolor": "#475569", "tickwidth": 1},
+                    "bar":   {"color": "#ef4444" if prob >= 0.5 else "#00d4aa", "thickness": 0.25},
+                    "bgcolor": "rgba(0,0,0,0)",
+                    "bordercolor": "rgba(139,92,246,0.2)",
+                    "steps": [
+                        {"range": [0, 30],   "color": "rgba(0,212,170,0.08)"},
+                        {"range": [30, 60],  "color": "rgba(251,191,36,0.06)"},
+                        {"range": [60, 100], "color": "rgba(239,68,68,0.08)"},
+                    ],
+                    "threshold": {"line": {"color": "#8b5cf6", "width": 2}, "value": 50},
+                },
+                title={"text": f"Risk score for {user_id}",
+                       "font": {"color": "#64748b", "size": 13}},
+            ))
+            fig_g.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                font=dict(family="Inter", color="#a0aec0"),
+                height=250, margin=dict(t=40, b=0, l=30, r=30),
+            )
+            st.plotly_chart(fig_g, use_container_width=True)
 
 
 # =============================================================================
