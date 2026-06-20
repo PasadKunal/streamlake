@@ -113,7 +113,7 @@ A production-grade, self-hosted data platform that unifies real-time event inges
 - [x] **Phase 1** — Event ingestion: Redpanda → Avro Schema Registry → Bronze Delta Lake
 - [x] **Phase 2** — Bronze → Silver: watermark tracking, dedup, Great Expectations, quarantine routing
 - [x] **Phase 3** — Silver → Gold: DuckDB aggregations (DAU, revenue, funnel, churn signals), Airflow DAG
-- [ ] **Phase 4** — ML Feature Store: Feast + Flink rolling windows + Redis + Delta offline
+- [x] **Phase 4** — ML Feature Store: Feast + DuckDB rolling windows + Redis online + Delta offline
 - [ ] **Phase 5** — ML Loop: XGBoost + MLflow + FastAPI inference + SHAP + A/B testing
 - [ ] **Phase 6** — Observability: PSI drift monitoring, Grafana dashboards, Locust load tests
 
@@ -395,6 +395,66 @@ pytest tests/orchestration/ -v   # 28 tests, all pass
 | Funnel | 10 (per country conversion rates) | < 0.5s |
 | UserSignals | 3,940 (one row per active user) | < 0.5s |
 | **Total** | **4,102 Gold rows from 4,999 Silver** | **2.4s end-to-end** |
+
+---
+
+## Phase 4 — ML Feature Store
+
+### What was built
+
+| File | Purpose |
+|------|---------|
+| [feature_store/feature_store.yaml](feature_store/feature_store.yaml) | Feast config — Redis online store, File offline store |
+| [feature_store/feature_repo.py](feature_store/feature_repo.py) | Feast entity (`user_id`) + `user_activity_features` FeatureView |
+| [feature_store/feature_pipeline.py](feature_store/feature_pipeline.py) | Computes 9 rolling-window features from Silver, writes to Parquet + Delta + Redis |
+| [feature_store/offline_store.py](feature_store/offline_store.py) | Point-in-time correct training dataset builder via `store.get_historical_features()` |
+| [verify_features.py](verify_features.py) | Verifies all 3 stores: offline Parquet, Redis, MinIO Delta |
+| [tests/feature_store/test_feature_pipeline.py](tests/feature_store/test_feature_pipeline.py) | 19 unit tests — rolling window boundary conditions |
+
+### The 9 features computed per user
+
+| Feature | Window | What it captures |
+|---------|--------|-----------------|
+| `purchase_count_1h` | 1 hour | Burst buying behaviour |
+| `purchase_count_24h` | 24 hours | Daily buying habit |
+| `purchase_count_7d` | 7 days | Weekly purchase frequency |
+| `revenue_sum_1h` | 1 hour | High-value session signal |
+| `revenue_sum_24h` | 24 hours | Daily spend |
+| `revenue_sum_7d` | 7 days | Weekly LTV signal |
+| `session_count_24h` | 24 hours | Engagement depth |
+| `event_count_24h` | 24 hours | Overall daily activity |
+| `days_since_last_purchase` | — | Recency (999 = never purchased) |
+
+### Why two stores?
+
+| Store | Technology | Used for | Latency |
+|-------|-----------|---------|---------|
+| Online | Redis | Real-time inference (Phase 5 FastAPI) | < 10ms p99 |
+| Offline | Parquet + Delta | Model training, point-in-time joins | seconds |
+
+### Running Phase 4 locally
+
+```bash
+source .venv/bin/activate
+
+# Run the feature pipeline (reads Silver → computes → writes to all 3 stores)
+python -m feature_store.feature_pipeline
+
+# Verify all stores
+python verify_features.py
+
+# Run unit tests
+pytest tests/feature_store/ -v   # 19 tests, all pass
+```
+
+### Results
+
+| Store | Records | Notes |
+|-------|---------|-------|
+| Offline Parquet | 3,940 users | 9 features per user |
+| Redis online store | 3,940 users | Zero null values |
+| MinIO Delta | 3,940 rows | Audit trail, time-travel |
+| **Tests** | **105 / 105** | Across all 4 phases |
 
 ---
 

@@ -63,3 +63,11 @@ service_account.json
 data/
 tmp/
 temp/
+
+# Feast generated files
+feature_store/registry.db
+feature_store/data/
+feature_store/online_store.db
+
+# Checkpoints
+.checkpoint/
