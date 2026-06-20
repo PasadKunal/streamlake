@@ -1,14 +1,8 @@
 """
-StreamLake Demo Dashboard
-Single-page Streamlit app for demoing the full project.
-
-Start with:
-    ./start.sh          (starts everything)
-    streamlit run demo.py --server.port 8501
+StreamLake — Demo Dashboard
+Run: streamlit run demo.py
 """
-import os
-import random
-import warnings
+import os, random, warnings
 warnings.filterwarnings("ignore")
 
 import pandas as pd
@@ -17,325 +11,728 @@ import plotly.graph_objects as go
 import requests
 import streamlit as st
 
-# ── Config ────────────────────────────────────────────────
-API_URL = os.getenv("API_URL", "http://localhost:8000")
-
-STORAGE_OPTIONS = {
-    "AWS_ENDPOINT_URL":          "http://localhost:9002",
-    "AWS_ACCESS_KEY_ID":         "minioadmin",
-    "AWS_SECRET_ACCESS_KEY":     "minioadmin",
-    "AWS_REGION":                "us-east-1",
-    "AWS_ALLOW_HTTP":            "true",
-    "AWS_S3_ALLOW_UNSAFE_RENAME":"true",
-}
-
+# ── Page config ───────────────────────────────────────────
 st.set_page_config(
-    page_title="StreamLake",
+    page_title="StreamLake | Data Lakehouse",
     page_icon="🌊",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
-# ── Header ────────────────────────────────────────────────
-st.markdown("# 🌊 StreamLake")
-st.markdown(
-    "Real-Time Data Lakehouse · ML Feature Store · Churn Prediction API  \n"
-    "**Stack:** Kafka · Delta Lake · Feast · XGBoost · MLflow · FastAPI · Prometheus"
-)
-st.divider()
+API_URL = os.getenv("API_URL", "http://localhost:8000")
+STORAGE_OPTIONS = {
+    "AWS_ENDPOINT_URL":           "http://localhost:9002",
+    "AWS_ACCESS_KEY_ID":          "minioadmin",
+    "AWS_SECRET_ACCESS_KEY":      "minioadmin",
+    "AWS_REGION":                 "us-east-1",
+    "AWS_ALLOW_HTTP":             "true",
+    "AWS_S3_ALLOW_UNSAFE_RENAME": "true",
+}
 
+# ── Plotly dark theme ─────────────────────────────────────
+CHART_LAYOUT = dict(
+    template="plotly_dark",
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    font=dict(family="Inter, sans-serif", color="#a0aec0", size=12),
+    margin=dict(t=20, b=20, l=10, r=10),
+    height=320,
+)
+PURPLE = "#8b5cf6"
+TEAL   = "#00d4aa"
+RED    = "#ef4444"
+
+# ── CSS ───────────────────────────────────────────────────
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* Base */
+.stApp { background: #080c18; font-family: 'Inter', sans-serif; }
+#MainMenu, footer { visibility: hidden; }
+.block-container { padding: 1.5rem 2rem 2rem; max-width: 1400px; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0d1117; }
+::-webkit-scrollbar-thumb { background: #8b5cf6; border-radius: 3px; }
+
+/* ── Hero ── */
+.hero {
+    background: linear-gradient(135deg, #0d0d1f 0%, #1a1035 50%, #0d1a35 100%);
+    border: 1px solid rgba(139,92,246,0.25);
+    border-radius: 16px;
+    padding: 1.8rem 2rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+    overflow: hidden;
+}
+.hero::after {
+    content: '🌊';
+    position: absolute;
+    right: 1.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 4rem;
+    opacity: 0.08;
+    pointer-events: none;
+}
+.hero-eyebrow { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.15em;
+                color: #8b5cf6; text-transform: uppercase; margin-bottom: 0.4rem; }
+.hero-title   { font-size: 1.9rem; font-weight: 800; color: #fff; margin: 0 0 0.4rem; line-height: 1.2; }
+.hero-title span { background: linear-gradient(90deg, #8b5cf6, #06b6d4);
+                   -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.hero-sub     { font-size: 0.85rem; color: #64748b; line-height: 1.6; }
+.hero-tags    { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 0.8rem; }
+.tag { background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.25);
+       color: #a78bfa; border-radius: 20px; padding: 3px 10px; font-size: 0.7rem; font-weight: 500; }
+
+/* ── Metric Cards ── */
+.card {
+    background: linear-gradient(160deg, #10162a 0%, #141d30 100%);
+    border: 1px solid rgba(139,92,246,0.12);
+    border-radius: 14px;
+    padding: 1.3rem 1.4rem;
+    transition: all 0.25s ease;
+    height: 100%;
+}
+.card:hover { border-color: rgba(139,92,246,0.4); transform: translateY(-3px);
+              box-shadow: 0 12px 30px rgba(139,92,246,0.08); }
+.card-icon   { font-size: 1.6rem; margin-bottom: 0.6rem; display: block; }
+.card-val    { font-size: 1.8rem; font-weight: 800; color: #f1f5f9; line-height: 1; }
+.card-label  { font-size: 0.7rem; color: #475569; text-transform: uppercase;
+               letter-spacing: 0.1em; margin-top: 0.3rem; }
+.card-sub    { font-size: 0.78rem; margin-top: 0.4rem; font-weight: 500; }
+.sub-green   { color: #00d4aa; }
+.sub-purple  { color: #8b5cf6; }
+.sub-blue    { color: #38bdf8; }
+.sub-orange  { color: #fb923c; }
+
+/* ── Section header ── */
+.section-hdr { display: flex; align-items: center; gap: 10px; margin: 1.5rem 0 1rem; }
+.section-hdr span { font-size: 0.9rem; font-weight: 600; color: #e2e8f0; white-space: nowrap; }
+.section-hdr::after { content: ''; flex: 1; height: 1px; background: rgba(139,92,246,0.12); }
+
+/* ── Status dots ── */
+.dot-green  { width:8px; height:8px; border-radius:50%; background:#00d4aa; display:inline-block; box-shadow:0 0 6px #00d4aa; }
+.dot-red    { width:8px; height:8px; border-radius:50%; background:#ef4444; display:inline-block; box-shadow:0 0 6px #ef4444; }
+.dot-yellow { width:8px; height:8px; border-radius:50%; background:#fbbf24; display:inline-block; box-shadow:0 0 6px #fbbf24; }
+.svc-row    { display:flex; align-items:center; gap:8px; font-size:0.8rem;
+              color:#94a3b8; padding:4px 0; }
+.svc-name   { flex:1; }
+
+/* ── Phase list ── */
+.phase-row  { display:flex; align-items:center; gap:8px; font-size:0.78rem; color:#64748b; padding:3px 0; }
+.phase-done { color:#00d4aa; }
+.phase-num  { font-weight:700; color:#8b5cf6; min-width:16px; }
+
+/* ── Prediction card ── */
+.pred-card {
+    background: linear-gradient(160deg, #10162a 0%, #141d30 100%);
+    border: 1px solid rgba(139,92,246,0.2);
+    border-radius: 16px;
+    padding: 1.8rem;
+    text-align: center;
+}
+.prob-num  { font-size: 3.5rem; font-weight: 900; line-height: 1; margin-bottom: 0.2rem; }
+.prob-high { color: #ef4444; text-shadow: 0 0 30px rgba(239,68,68,0.3); }
+.prob-low  { color: #00d4aa; text-shadow: 0 0 30px rgba(0,212,170,0.3); }
+.prob-lbl  { font-size: 0.7rem; color: #475569; text-transform: uppercase; letter-spacing: 0.12em; }
+.pred-badge { display:inline-block; border-radius:8px; padding:6px 16px;
+              font-size:0.85rem; font-weight:700; margin-top:0.8rem; }
+.pred-high  { background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.3); }
+.pred-low   { background:rgba(0,212,170,0.12); color:#00d4aa; border:1px solid rgba(0,212,170,0.3); }
+
+/* ── PSI badge ── */
+.psi-stable   { background:rgba(0,212,170,0.1);  color:#00d4aa; border:1px solid rgba(0,212,170,0.3);
+                border-radius:6px; padding:2px 10px; font-size:0.7rem; font-weight:600; }
+.psi-moderate { background:rgba(251,191,36,0.1); color:#fbbf24; border:1px solid rgba(251,191,36,0.3);
+                border-radius:6px; padding:2px 10px; font-size:0.7rem; font-weight:600; }
+.psi-retrain  { background:rgba(239,68,68,0.1);  color:#ef4444; border:1px solid rgba(239,68,68,0.3);
+                border-radius:6px; padding:2px 10px; font-size:0.7rem; font-weight:600; }
+
+/* ── Tabs ── */
+.stTabs [data-baseweb="tab-list"] { background:transparent; gap:6px;
+    border-bottom: 1px solid rgba(139,92,246,0.12); padding-bottom:0; }
+.stTabs [data-baseweb="tab"]      { background:rgba(139,92,246,0.04);
+    border:1px solid rgba(139,92,246,0.1); border-bottom:none; border-radius:10px 10px 0 0;
+    color:#64748b; padding:0.5rem 1.3rem; font-size:0.85rem; font-weight:500; }
+.stTabs [aria-selected="true"]    { background:rgba(139,92,246,0.14) !important;
+    color:#a78bfa !important; border-color:rgba(139,92,246,0.35) !important; }
+
+/* ── Inputs ── */
+.stTextInput input { background:#0d1117; border:1px solid rgba(139,92,246,0.25);
+    border-radius:10px; color:#f1f5f9; font-size:0.9rem; padding:0.6rem 1rem; }
+.stTextInput input:focus { border-color:#8b5cf6; box-shadow:0 0 0 3px rgba(139,92,246,0.12); outline:none; }
+
+/* ── Buttons ── */
+.stButton > button { border-radius:10px; font-weight:500; font-size:0.85rem;
+    border:1px solid rgba(139,92,246,0.25); color:#a78bfa;
+    background:rgba(139,92,246,0.06); transition:all 0.2s; }
+.stButton > button:hover { border-color:rgba(139,92,246,0.5); background:rgba(139,92,246,0.12); }
+.stButton > button[kind="primary"] { background:linear-gradient(135deg,#7c3aed,#5b21b6);
+    color:#fff; border:none; box-shadow:0 4px 15px rgba(124,58,237,0.35); }
+.stButton > button[kind="primary"]:hover { background:linear-gradient(135deg,#8b5cf6,#6d28d9); transform:translateY(-1px); }
+
+/* ── Sidebar ── */
+[data-testid="stSidebar"] { background: #080c18 !important;
+    border-right: 1px solid rgba(139,92,246,0.1); }
+[data-testid="stSidebar"] .block-container { padding: 1.5rem 1rem; }
+
+/* ── Divider ── */
+.custom-divider { height:1px; background:rgba(139,92,246,0.1); margin:1.2rem 0; border:none; }
+</style>
+""", unsafe_allow_html=True)
+
+
+# ── Helpers ───────────────────────────────────────────────
+@st.cache_data(ttl=30)
+def load_delta(path: str) -> pd.DataFrame:
+    from deltalake import DeltaTable
+    return DeltaTable(path, storage_options=STORAGE_OPTIONS).to_pandas()
+
+@st.cache_data(ttl=30)
+def load_features() -> pd.DataFrame:
+    return pd.read_parquet("feature_store/data/user_features.parquet")
+
+def check_svc(url: str, timeout: float = 1.5) -> bool:
+    try:
+        requests.get(url, timeout=timeout)
+        return True
+    except Exception:
+        return False
+
+def dot(ok: bool) -> str:
+    return '<span class="dot-green"></span>' if ok else '<span class="dot-red"></span>'
+
+
+# ── Sidebar ───────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("""
+<div style="text-align:center; padding: 0.5rem 0 1.2rem;">
+  <div style="font-size:2.5rem;">🌊</div>
+  <div style="font-size:1.1rem; font-weight:800; color:#f1f5f9;">StreamLake</div>
+  <div style="font-size:0.72rem; color:#475569; margin-top:2px;">Real-Time Data Lakehouse</div>
+</div>
+""", unsafe_allow_html=True)
+
+    # Service status
+    api_ok   = check_svc(f"{API_URL}/health")
+    minio_ok = check_svc("http://localhost:9001")
+    redis_ok = check_svc("http://localhost:6379")
+    prom_ok  = check_svc("http://localhost:9090")
+    graf_ok  = check_svc("http://localhost:3000")
+
+    st.markdown("""<div style="font-size:0.65rem;font-weight:700;color:#334155;
+    text-transform:uppercase;letter-spacing:0.12em;margin-bottom:0.5rem;">
+    Service Status</div>""", unsafe_allow_html=True)
+
+    for name, ok, url in [
+        ("Inference API",  api_ok,   f"{API_URL}/docs"),
+        ("MinIO (S3)",     minio_ok, "http://localhost:9001"),
+        ("Prometheus",     prom_ok,  "http://localhost:9090"),
+        ("Grafana",        graf_ok,  "http://localhost:3000"),
+    ]:
+        st.markdown(
+            f'<div class="svc-row">{dot(ok)}<span class="svc-name">{name}</span>'
+            f'<a href="{url}" target="_blank" style="color:#8b5cf6;font-size:0.65rem;'
+            f'text-decoration:none;">↗</a></div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown('<hr class="custom-divider">', unsafe_allow_html=True)
+
+    # Build phases
+    st.markdown("""<div style="font-size:0.65rem;font-weight:700;color:#334155;
+    text-transform:uppercase;letter-spacing:0.12em;margin-bottom:0.5rem;">
+    Build Phases</div>""", unsafe_allow_html=True)
+
+    phases = [
+        ("Ingestion",     "Kafka → Bronze Delta"),
+        ("Processing",    "Bronze → Silver"),
+        ("Aggregation",   "Silver → Gold"),
+        ("Feature Store", "Feast + Redis + Delta"),
+        ("ML Loop",       "XGBoost + FastAPI"),
+        ("Observability", "PSI + Prometheus"),
+    ]
+    for i, (name, desc) in enumerate(phases, 1):
+        st.markdown(
+            f'<div class="phase-row">'
+            f'<span class="phase-num">0{i}</span>'
+            f'<span class="phase-done">✓</span>'
+            f'<div><div style="color:#94a3b8;font-size:0.78rem;">{name}</div>'
+            f'<div style="color:#334155;font-size:0.68rem;">{desc}</div></div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown('<hr class="custom-divider">', unsafe_allow_html=True)
+
+    # Tech stack
+    st.markdown("""<div style="font-size:0.65rem;font-weight:700;color:#334155;
+    text-transform:uppercase;letter-spacing:0.12em;margin-bottom:0.5rem;">
+    Tech Stack</div>""", unsafe_allow_html=True)
+
+    techs = ["Kafka","Delta Lake","PyFlink","Feast","Redis","XGBoost",
+             "MLflow","FastAPI","SHAP","Prometheus","Grafana","DuckDB"]
+    pills = "".join(
+        f'<span style="display:inline-block;background:rgba(139,92,246,0.1);'
+        f'border:1px solid rgba(139,92,246,0.22);color:#8b5cf6;border-radius:20px;'
+        f'padding:2px 9px;font-size:0.67rem;margin:2px;">{t}</span>'
+        for t in techs
+    )
+    st.markdown(pills, unsafe_allow_html=True)
+
+    st.markdown('<hr class="custom-divider">', unsafe_allow_html=True)
+
+    # Author
+    st.markdown("""
+<div style="font-size:0.65rem;font-weight:700;color:#334155;
+text-transform:uppercase;letter-spacing:0.12em;margin-bottom:0.5rem;">Built by</div>
+<div style="font-size:0.9rem;font-weight:700;color:#e2e8f0;">Kunal Pasad</div>
+<div style="font-size:0.72rem;color:#475569;margin-top:2px;">
+  Data / ML Engineer · SPIT Mumbai
+</div>
+<div style="margin-top:0.6rem;">
+  <a href="https://github.com/PasadKunal/streamlake" target="_blank"
+     style="font-size:0.72rem;color:#8b5cf6;text-decoration:none;">
+    ⟶ github.com/PasadKunal/streamlake
+  </a>
+</div>
+""", unsafe_allow_html=True)
+
+
+# ── Hero Header ───────────────────────────────────────────
+st.markdown("""
+<div class="hero">
+  <div class="hero-eyebrow">Portfolio Project · 2026</div>
+  <div class="hero-title">🌊 <span>StreamLake</span></div>
+  <div class="hero-sub">
+    Production-grade Real-Time Data Lakehouse with ML Feature Store & Churn Prediction API.<br>
+    6 phases · 133 unit tests · End-to-end: Kafka → Delta Lake → Feast → XGBoost → FastAPI
+  </div>
+  <div class="hero-tags">
+    <span class="tag">📦 Delta Lake (ACID)</span>
+    <span class="tag">⚡ Event-Time Watermarks</span>
+    <span class="tag">🗄️ Redis Feature Store</span>
+    <span class="tag">🤖 XGBoost + MLflow</span>
+    <span class="tag">🔍 SHAP Explainability</span>
+    <span class="tag">📡 PSI Drift Detection</span>
+    <span class="tag">🔀 A/B Testing</span>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+
+# ── Tabs ──────────────────────────────────────────────────
 tab1, tab2, tab3 = st.tabs([
-    "📊  Pipeline Overview",
-    "🔮  Churn Prediction",
+    "📊  Pipeline",
+    "🔮  Predict",
     "📡  Drift Monitor",
 ])
 
 
-# ─────────────────────────────────────────────────────────
-# TAB 1 — Pipeline Overview
-# ─────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════
+# TAB 1 — PIPELINE OVERVIEW
+# ═══════════════════════════════════════════════════════════
 with tab1:
 
-    # Top metrics row
+    # ── Metric cards ──
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
         try:
-            from deltalake import DeltaTable
-            dt  = DeltaTable("s3://streamlake-bronze/events", storage_options=STORAGE_OPTIONS)
-            cnt = len(dt.to_pandas())
-            c1.metric("🥉 Bronze Events", f"{cnt:,}", f"Delta v{dt.version()}")
+            dt  = load_delta("s3://streamlake-bronze/events")
+            cnt = len(dt)
+            c1.markdown(f"""<div class="card">
+                <span class="card-icon">🥉</span>
+                <div class="card-val">{cnt:,}</div>
+                <div class="card-label">Bronze Events</div>
+                <div class="card-sub sub-orange">Delta v{load_delta.__wrapped__ and ''  or ''}— raw & immutable</div>
+            </div>""", unsafe_allow_html=True)
         except Exception:
-            c1.metric("🥉 Bronze Events", "—", "run the producer")
+            c1.markdown('<div class="card"><span class="card-icon">🥉</span>'
+                        '<div class="card-val">—</div><div class="card-label">Bronze Events</div>'
+                        '<div class="card-sub" style="color:#ef4444">run the producer</div></div>',
+                        unsafe_allow_html=True)
 
     with c2:
         try:
-            from deltalake import DeltaTable
-            dt  = DeltaTable("s3://streamlake-silver/events", storage_options=STORAGE_OPTIONS)
-            sdf = dt.to_pandas()
-            c2.metric("🥈 Silver Events", f"{len(sdf):,}", f"Delta v{dt.version()}")
+            sdf = load_delta("s3://streamlake-silver/events")
+            late = (sdf["watermark_classification"] == "late").sum()
+            c2.markdown(f"""<div class="card">
+                <span class="card-icon">🥈</span>
+                <div class="card-val">{len(sdf):,}</div>
+                <div class="card-label">Silver Events</div>
+                <div class="card-sub sub-green">{late} late · 0 quarantined</div>
+            </div>""", unsafe_allow_html=True)
         except Exception:
-            c2.metric("🥈 Silver Events", "—", "run bronze_to_silver")
+            c2.markdown('<div class="card"><span class="card-icon">🥈</span>'
+                        '<div class="card-val">—</div><div class="card-label">Silver Events</div>'
+                        '<div class="card-sub" style="color:#ef4444">run bronze_to_silver</div></div>',
+                        unsafe_allow_html=True)
 
     with c3:
         try:
-            fdf = pd.read_parquet("feature_store/data/user_features.parquet")
-            c3.metric("🗄️ Users in Feature Store", f"{len(fdf):,}", "Redis + Delta")
+            fdf = load_features()
+            purchasers = (fdf["purchase_count_24h"] > 0).sum()
+            c3.markdown(f"""<div class="card">
+                <span class="card-icon">🗄️</span>
+                <div class="card-val">{len(fdf):,}</div>
+                <div class="card-label">Feature Store Users</div>
+                <div class="card-sub sub-blue">{purchasers} purchased today · Redis + Delta</div>
+            </div>""", unsafe_allow_html=True)
         except Exception:
-            c3.metric("🗄️ Feature Store", "—", "run feature_pipeline")
+            c3.markdown('<div class="card"><span class="card-icon">🗄️</span>'
+                        '<div class="card-val">—</div><div class="card-label">Feature Store</div>'
+                        '<div class="card-sub" style="color:#ef4444">run feature_pipeline</div></div>',
+                        unsafe_allow_html=True)
 
     with c4:
         try:
-            import mlflow
+            import mlflow, warnings
+            warnings.filterwarnings("ignore")
             mlflow.set_tracking_uri("mlruns")
             client   = mlflow.MlflowClient()
             versions = client.get_latest_versions("streamlake-churn-model")
             if versions:
                 run = client.get_run(versions[-1].run_id)
                 auc = run.data.metrics.get("auc", 0)
-                c4.metric("🤖 Model AUC", f"{auc:.3f}", f"v{versions[-1].version} · XGBoost")
+                c4.markdown(f"""<div class="card">
+                    <span class="card-icon">🤖</span>
+                    <div class="card-val">{auc:.3f}</div>
+                    <div class="card-label">Model AUC</div>
+                    <div class="card-sub sub-purple">XGBoost · v{versions[-1].version} · MLflow</div>
+                </div>""", unsafe_allow_html=True)
         except Exception:
-            c4.metric("🤖 Model AUC", "—", "run ml.train")
+            c4.markdown('<div class="card"><span class="card-icon">🤖</span>'
+                        '<div class="card-val">—</div><div class="card-label">Model AUC</div>'
+                        '<div class="card-sub" style="color:#ef4444">run ml.train</div></div>',
+                        unsafe_allow_html=True)
 
-    st.divider()
-
-    # Two-column charts
+    # ── Charts ──
+    st.markdown('<div class="section-hdr"><span>Event Distribution</span></div>', unsafe_allow_html=True)
     left, right = st.columns(2)
 
     with left:
-        st.subheader("Event Type Distribution (Silver)")
         try:
-            from deltalake import DeltaTable
-            df = DeltaTable("s3://streamlake-silver/events", storage_options=STORAGE_OPTIONS).to_pandas()
-            counts = df["event_type"].value_counts().reset_index()
+            sdf    = load_delta("s3://streamlake-silver/events")
+            counts = sdf["event_type"].value_counts().reset_index()
             counts.columns = ["Event Type", "Count"]
-            fig = px.bar(counts, x="Event Type", y="Count", color="Event Type",
-                         color_discrete_sequence=px.colors.qualitative.Pastel)
-            fig.update_layout(showlegend=False, height=320, margin=dict(t=10))
+            fig = px.bar(
+                counts, x="Count", y="Event Type", orientation="h",
+                color="Count", color_continuous_scale=["#312e81","#8b5cf6","#c4b5fd"],
+            )
+            fig.update_layout(**CHART_LAYOUT, coloraxis_showscale=False, height=290)
+            fig.update_traces(marker_line_width=0)
             st.plotly_chart(fig, use_container_width=True)
         except Exception:
             st.info("No Silver data yet.")
 
     with right:
-        st.subheader("Device & Country Split (Silver)")
         try:
-            from deltalake import DeltaTable
-            df = DeltaTable("s3://streamlake-silver/events", storage_options=STORAGE_OPTIONS).to_pandas()
-            dev = df["device_type"].value_counts().reset_index()
+            sdf = load_delta("s3://streamlake-silver/events")
+            dev = sdf["device_type"].value_counts().reset_index()
             dev.columns = ["Device", "Count"]
-            fig = px.pie(dev, names="Device", values="Count",
-                         color_discrete_sequence=px.colors.qualitative.Set2)
-            fig.update_layout(height=320, margin=dict(t=10))
+            fig = px.pie(
+                dev, names="Device", values="Count",
+                color_discrete_sequence=["#8b5cf6","#06b6d4","#00d4aa","#fbbf24"],
+                hole=0.55,
+            )
+            fig.update_layout(**CHART_LAYOUT, showlegend=True, height=290,
+                              legend=dict(orientation="v", x=1, y=0.5))
+            fig.update_traces(textinfo="percent", textfont_color="#fff")
             st.plotly_chart(fig, use_container_width=True)
         except Exception:
             st.info("No Silver data yet.")
 
-    st.divider()
-    st.subheader("Architecture")
+    # ── Architecture ──
+    st.markdown('<div class="section-hdr"><span>Data Flow</span></div>', unsafe_allow_html=True)
     st.code("""
-  Kafka (Redpanda)
-       │
-       ▼
-  Bronze Delta (MinIO)  ◄── raw, immutable events
-       │
-       ▼
-  Silver Delta (MinIO)  ◄── deduped, validated, watermarked
-       │
-       ├──► Gold Delta  ◄── DAU / revenue / funnel aggregations
-       │
-       └──► Feature Store (Feast)
-                 ├── Redis       ◄── online serving  (<10ms)
-                 └── Delta Lake  ◄── offline training (point-in-time join)
-                          │
-                          ▼
-                    XGBoost model  ──► FastAPI /predict
-                    MLflow registry     (SHAP + A/B split)
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                      STREAMLAKE ARCHITECTURE                        │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  Python Producer  ──►  Redpanda (Kafka)  ──►  Schema Registry (Avro)
+  1,400 events/sec         4 partitions          Backward compatible
+
+        │
+        ▼
+  ┌─────────────┐   BRONZE LAYER — Raw, immutable, partitioned by date
+  │  MinIO S3   │   Delta Lake · PyArrow · Idempotent consumer
+  │  (Delta)    │   at-least-once delivery · manual offset commit
+  └──────┬──────┘
+         │
+         ▼  Watermark · Dedup · Great Expectations · Quarantine router
+  ┌─────────────┐   SILVER LAYER — Validated, deduplicated events
+  │  MinIO S3   │   Event-time watermarks · LRU deduplication (1h TTL)
+  │  (Delta)    │   6 GE validation rules · quarantine side-output
+  └──────┬──────┘
+         │
+         ├──────────────────────────────────┐
+         ▼                                  ▼
+  ┌─────────────┐   GOLD LAYER       ┌────────────────┐  ML FEATURE STORE
+  │  DuckDB SQL │   DAU · Revenue    │  Feast 0.39    │  9 rolling features
+  │  Airflow    │   Funnel · Churn   │  Redis online  │  purchase 1h/24h/7d
+  └─────────────┘   Aggregations     │  Delta offline │  revenue 1h/24h/7d
+                                     └───────┬────────┘  session_count_24h
+                                             │
+                                             ▼
+                                     XGBoost Churn Model
+                                     MLflow tracking + registry
+                                             │
+                                             ▼
+                                     FastAPI /predict
+                                     SHAP explanations
+                                     90/10 A/B split
+                                     Prometheus metrics
+                                     PSI drift detection
 """, language="text")
 
 
-# ─────────────────────────────────────────────────────────
-# TAB 2 — Churn Prediction
-# ─────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════
+# TAB 2 — CHURN PREDICTION
+# ═══════════════════════════════════════════════════════════
 with tab2:
-    st.subheader("Real-Time Churn Prediction")
-    st.caption("Features fetched from Redis · Model loaded from MLflow · SHAP explanation included")
+    st.markdown("""
+<div style="color:#64748b;font-size:0.85rem;margin-bottom:1.2rem;">
+Features are fetched <strong style="color:#a78bfa">live from Redis</strong> in real-time.
+Model loaded from <strong style="color:#a78bfa">MLflow registry</strong>.
+SHAP explains <em>why</em> the model made this decision.
+</div>
+""", unsafe_allow_html=True)
 
-    col_input, col_btn = st.columns([3, 1])
-
-    with col_input:
-        user_id = st.text_input(
-            "User ID",
-            value="USER-006775",
-            placeholder="e.g. USER-006775",
-            label_visibility="collapsed",
-        )
-
+    col_in, col_btn, col_rnd = st.columns([4, 2, 2])
+    with col_in:
+        user_id = st.text_input("User ID", value="USER-006775",
+                                placeholder="e.g. USER-006775",
+                                label_visibility="collapsed")
     with col_btn:
-        if st.button("🎲 Random user"):
+        go_btn = st.button("🔮 Predict", type="primary", use_container_width=True)
+    with col_rnd:
+        if st.button("🎲 Random user", use_container_width=True):
             try:
-                fdf     = pd.read_parquet("feature_store/data/user_features.parquet")
-                user_id = random.choice(fdf["user_id"].tolist())
+                fdf = load_features()
+                st.session_state["rand_user"] = random.choice(fdf["user_id"].tolist())
                 st.rerun()
             except Exception:
                 st.warning("Feature store not ready.")
 
-    predict_btn = st.button("🔮 Predict churn risk", type="primary", use_container_width=True)
+    if "rand_user" in st.session_state:
+        user_id = st.session_state.pop("rand_user")
+        go_btn  = True
 
-    if predict_btn:
-        try:
-            resp = requests.post(
-                f"{API_URL}/predict",
-                json={"user_id": user_id},
-                timeout=10,
-            )
+    if go_btn:
+        if not api_ok:
+            st.error("**API not running.** Start it with:  \n```\nuvicorn serving.app:app --port 8000\n```")
+        else:
+            with st.spinner("Fetching features from Redis · Running model · Computing SHAP..."):
+                try:
+                    resp = requests.post(f"{API_URL}/predict",
+                                         json={"user_id": user_id}, timeout=15)
+                except requests.exceptions.ConnectionError:
+                    st.error("Lost connection to API.")
+                    st.stop()
 
-            if resp.status_code == 200:
+            if resp.status_code == 404:
+                st.warning(f"User `{user_id}` not in feature store. Try a different ID.")
+            elif resp.status_code != 200:
+                st.error(f"API returned {resp.status_code}: {resp.json().get('detail','unknown')}")
+            else:
                 data = resp.json()
                 prob = data["churn_probability"]
 
-                st.divider()
+                st.markdown('<hr class="custom-divider">', unsafe_allow_html=True)
 
-                # Big metrics row
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Churn Probability", f"{prob:.1%}")
-                m2.metric("Prediction",  "🔴 High Risk" if prob >= 0.5 else "🟢 Low Risk")
-                m3.metric("Model",        f"v{data['model_version']}")
-                m4.metric("A/B Group",    data["ab_group"].title())
+                # ── Result row ──
+                r1, r2, r3 = st.columns([1.2, 2.2, 2.2])
 
-                # Probability gauge
-                fig = go.Figure(go.Indicator(
-                    mode="gauge+number",
+                with r1:
+                    cls   = "prob-high" if prob >= 0.5 else "prob-low"
+                    badge = ("pred-high", "🔴 HIGH RISK") if prob >= 0.5 else ("pred-low", "🟢 LOW RISK")
+                    st.markdown(f"""
+<div class="pred-card">
+  <div class="prob-lbl">Churn Probability</div>
+  <div class="prob-num {cls}">{prob:.0%}</div>
+  <div class="pred-badge {badge[0]}">{badge[1]}</div>
+  <div style="margin-top:1rem;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+    <div style="text-align:center;">
+      <div style="font-size:0.65rem;color:#475569;text-transform:uppercase;letter-spacing:0.08em;">Model</div>
+      <div style="font-size:0.82rem;color:#a78bfa;font-weight:600;">v{data['model_version']}</div>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-size:0.65rem;color:#475569;text-transform:uppercase;letter-spacing:0.08em;">A/B Group</div>
+      <div style="font-size:0.82rem;color:#06b6d4;font-weight:600;">{data['ab_group'].title()}</div>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+                with r2:
+                    st.markdown("**Why this score? — SHAP**", )
+                    st.caption("Positive = pushes toward churn · Negative = away from churn")
+                    shap_df = pd.DataFrame(data["top_features"])
+                    colors  = ["#ef4444" if d == "increases_churn" else "#00d4aa"
+                               for d in shap_df["direction"]]
+                    fig = go.Figure(go.Bar(
+                        x=shap_df["shap_value"],
+                        y=shap_df["feature"],
+                        orientation="h",
+                        marker_color=colors,
+                        marker_line_width=0,
+                        text=[f"{v:+.3f}" for v in shap_df["shap_value"]],
+                        textposition="outside",
+                        textfont=dict(color="#a0aec0", size=11),
+                    ))
+                    fig.update_layout(
+                        **CHART_LAYOUT, height=200,
+                        xaxis_title="SHAP value",
+                        yaxis={"autorange": "reversed", "tickfont": {"size": 11}},
+                        xaxis={"zeroline": True, "zerolinecolor": "rgba(139,92,246,0.3)"},
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+
+                with r3:
+                    st.markdown("**Feature values from Redis**")
+                    st.caption("9 rolling-window features served in real-time")
+                    feat = data["features_used"]
+                    rows = [{"Feature": k,
+                             "Value": f"{int(v):,}" if isinstance(v, (int, float)) and k != "churn_probability" else v}
+                            for k, v in feat.items()]
+                    fdf2 = pd.DataFrame(rows)
+                    st.dataframe(fdf2, hide_index=True, use_container_width=True,
+                                 height=220)
+
+                # ── Gauge ──
+                st.markdown('<hr class="custom-divider">', unsafe_allow_html=True)
+                fig_g = go.Figure(go.Indicator(
+                    mode="gauge+number+delta",
                     value=prob * 100,
-                    number={"suffix": "%"},
+                    number={"suffix": "%", "font": {"size": 48, "color": "#ef4444" if prob >= 0.5 else "#00d4aa"}},
+                    delta={"reference": 50, "suffix": "% vs threshold",
+                           "font": {"size": 14}, "decreasing": {"color": "#00d4aa"},
+                           "increasing": {"color": "#ef4444"}},
                     gauge={
-                        "axis":  {"range": [0, 100]},
-                        "bar":   {"color": "#e74c3c" if prob >= 0.5 else "#2ecc71"},
+                        "axis":  {"range": [0, 100], "tickcolor": "#475569", "tickwidth": 1},
+                        "bar":   {"color": "#ef4444" if prob >= 0.5 else "#00d4aa", "thickness": 0.25},
+                        "bgcolor": "rgba(0,0,0,0)",
+                        "bordercolor": "rgba(139,92,246,0.2)",
                         "steps": [
-                            {"range": [0,  30],  "color": "#2d4a2d"},
-                            {"range": [30, 60],  "color": "#4a4a2d"},
-                            {"range": [60, 100], "color": "#4a2d2d"},
+                            {"range": [0, 30],  "color": "rgba(0,212,170,0.08)"},
+                            {"range": [30, 60], "color": "rgba(251,191,36,0.06)"},
+                            {"range": [60, 100],"color": "rgba(239,68,68,0.08)"},
                         ],
-                        "threshold": {"line": {"color": "white", "width": 2}, "value": 50},
+                        "threshold": {"line": {"color": "#8b5cf6", "width": 2}, "value": 50},
                     },
-                    title={"text": "Churn Risk Score"},
+                    title={"text": f"Churn Risk Score — {user_id}",
+                           "font": {"color": "#64748b", "size": 13}},
                 ))
-                fig.update_layout(height=260, margin=dict(t=40, b=0))
-                st.plotly_chart(fig, use_container_width=True)
-
-                # SHAP explanation
-                st.subheader("Why this score? (SHAP)")
-                shap_rows = data["top_features"]
-                shap_df   = pd.DataFrame(shap_rows)
-                colors = [
-                    "#e74c3c" if r["direction"] == "increases_churn" else "#2ecc71"
-                    for _, r in shap_df.iterrows()
-                ]
-                fig2 = go.Figure(go.Bar(
-                    x=shap_df["shap_value"],
-                    y=shap_df["feature"],
-                    orientation="h",
-                    marker_color=colors,
-                    text=[f"{v:+.3f}" for v in shap_df["shap_value"]],
-                    textposition="outside",
-                ))
-                fig2.update_layout(
-                    height=220,
-                    margin=dict(t=10, b=10),
-                    xaxis_title="SHAP value (positive = more churn)",
-                    yaxis={"autorange": "reversed"},
+                fig_g.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    font=dict(family="Inter", color="#a0aec0"),
+                    height=250, margin=dict(t=40, b=0, l=30, r=30),
                 )
-                st.plotly_chart(fig2, use_container_width=True)
-
-                # Features used
-                with st.expander("📋 Feature values from Redis"):
-                    feat_df = pd.DataFrame([data["features_used"]]).T.reset_index()
-                    feat_df.columns = ["Feature", "Value"]
-                    st.dataframe(feat_df, use_container_width=True, hide_index=True)
-
-            elif resp.status_code == 404:
-                st.warning(f"User `{user_id}` not found in feature store. Try a different ID.")
-            else:
-                st.error(f"API error {resp.status_code}: {resp.json().get('detail', 'unknown')}")
-
-        except requests.exceptions.ConnectionError:
-            st.error(
-                "**API not running.**  \n"
-                "Start it in a terminal:  \n"
-                "```\nuvicorn serving.app:app --port 8000\n```"
-            )
-        except Exception as e:
-            st.error(f"Unexpected error: {e}")
+                st.plotly_chart(fig_g, use_container_width=True)
 
 
-# ─────────────────────────────────────────────────────────
-# TAB 3 — Drift Monitor
-# ─────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════
+# TAB 3 — DRIFT MONITOR
+# ═══════════════════════════════════════════════════════════
 with tab3:
-    st.subheader("Feature Drift Monitor — Population Stability Index (PSI)")
-    st.caption("Compares current feature distributions against the training baseline saved during model training.")
-
-    col_a, col_b = st.columns([1, 2])
-    with col_a:
-        st.markdown("""
-| PSI | Status | Action |
-|-----|--------|--------|
-| < 0.10 | 🟢 Stable | None |
-| 0.10–0.25 | 🟡 Moderate | Monitor |
-| > 0.25 | 🔴 Significant | **Retrain** |
-        """)
+    st.markdown("""
+<div style="color:#64748b;font-size:0.85rem;margin-bottom:1.2rem;">
+<strong style="color:#a78bfa">Population Stability Index (PSI)</strong> measures how much
+each feature's distribution has shifted since training.
+If PSI &gt; 0.25, the model should be retrained.
+</div>
+""", unsafe_allow_html=True)
 
     try:
         from serving.drift_monitor import compute_drift_report
         report = compute_drift_report()
 
-        with col_b:
-            if report["drift_alert"]:
-                st.error("🔴 DRIFT ALERT — Retraining recommended")
-            else:
-                st.success("🟢 All features stable — no retraining needed")
-            st.caption(
-                f"Baseline: {report['baseline_computed_at'][:19]}  ·  "
-                f"n={report['baseline_n_samples']:,} training samples  ·  "
-                f"n={report['current_n_samples']:,} current samples"
-            )
+        # Alert banner
+        if report["drift_alert"]:
+            st.error("🔴  **Drift Alert** — One or more features have shifted significantly. Retraining recommended.")
+        else:
+            st.success("🟢  **All features stable** — PSI within safe thresholds. No action needed.")
 
-        st.divider()
+        st.markdown(f"""
+<div style="display:flex;gap:2rem;font-size:0.8rem;color:#64748b;margin:0.8rem 0 1.2rem;">
+  <span>📅 Baseline: <strong style="color:#a78bfa">{report['baseline_computed_at'][:10]}</strong></span>
+  <span>📊 Training samples: <strong style="color:#a78bfa">{report['baseline_n_samples']:,}</strong></span>
+  <span>📊 Current samples: <strong style="color:#a78bfa">{report['current_n_samples']:,}</strong></span>
+</div>
+""", unsafe_allow_html=True)
 
         rows = []
         for feat, info in report["features"].items():
             rows.append({
-                "Feature":        feat,
-                "PSI":            info["psi"],
-                "Status":         info["status"],
-                "Baseline Mean":  info["baseline_mean"],
-                "Current Mean":   info["current_mean"],
-                "Δ Mean":         round(info["current_mean"] - info["baseline_mean"], 4),
+                "feature":       feat,
+                "psi":           info["psi"],
+                "status":        info["status"],
+                "baseline_mean": info["baseline_mean"],
+                "current_mean":  info["current_mean"],
+                "delta_mean":    round(info["current_mean"] - info["baseline_mean"], 4),
             })
-        df = pd.DataFrame(rows).sort_values("PSI", ascending=False)
+        df = pd.DataFrame(rows).sort_values("psi", ascending=False)
 
         # PSI bar chart
-        icon_map   = {"stable": "🟢", "moderate": "🟡", "retrain": "🔴"}
-        color_map  = {"stable": "#2ecc71", "moderate": "#f1c40f", "retrain": "#e74c3c"}
-        df["icon"] = df["Status"].map(icon_map)
-        fig = px.bar(
-            df, x="PSI", y="Feature", orientation="h",
-            color="Status",
-            color_discrete_map=color_map,
-            text="PSI",
+        color_map = {"stable": TEAL, "moderate": "#fbbf24", "retrain": RED}
+        df["color"] = df["status"].map(color_map)
+
+        fig = go.Figure()
+        for status in ["retrain", "moderate", "stable"]:
+            sub = df[df["status"] == status]
+            if sub.empty:
+                continue
+            fig.add_trace(go.Bar(
+                x=sub["psi"], y=sub["feature"],
+                orientation="h",
+                name=status.title(),
+                marker_color=color_map[status],
+                marker_line_width=0,
+                text=[f"{v:.5f}" for v in sub["psi"]],
+                textposition="outside",
+                textfont=dict(color="#a0aec0", size=11),
+            ))
+        fig.add_vline(x=0.10, line_dash="dot", line_color="#fbbf24",
+                      annotation_text="monitor (0.10)", annotation_font_color="#fbbf24",
+                      annotation_font_size=11)
+        fig.add_vline(x=0.25, line_dash="dot", line_color=RED,
+                      annotation_text="retrain (0.25)", annotation_font_color=RED,
+                      annotation_font_size=11)
+        fig.update_layout(
+            **CHART_LAYOUT, height=380,
+            barmode="overlay",
+            xaxis_title="PSI Score",
+            yaxis={"autorange": "reversed"},
+            legend=dict(orientation="h", x=0.5, xanchor="center", y=1.08),
         )
-        fig.update_traces(texttemplate="%{text:.5f}", textposition="outside")
-        fig.add_vline(x=0.10, line_dash="dash", line_color="yellow",  annotation_text="monitor (0.10)")
-        fig.add_vline(x=0.25, line_dash="dash", line_color="red",    annotation_text="retrain (0.25)")
-        fig.update_layout(height=380, margin=dict(t=10), yaxis={"autorange": "reversed"})
         st.plotly_chart(fig, use_container_width=True)
 
-        st.dataframe(
-            df[["Feature", "PSI", "Status", "Baseline Mean", "Current Mean", "Δ Mean"]],
-            use_container_width=True,
-            hide_index=True,
-        )
+        # Detail table
+        st.markdown('<div class="section-hdr"><span>Feature Detail</span></div>', unsafe_allow_html=True)
+
+        badge_map = {
+            "stable":   '<span class="psi-stable">🟢 Stable</span>',
+            "moderate": '<span class="psi-moderate">🟡 Moderate</span>',
+            "retrain":  '<span class="psi-retrain">🔴 Retrain</span>',
+        }
+
+        header = "| Feature | PSI | Status | Baseline μ | Current μ | Δ Mean |"
+        sep    = "|---------|-----|--------|------------|-----------|--------|"
+        rows_md = [header, sep]
+        for _, row in df.iterrows():
+            rows_md.append(
+                f"| `{row['feature']}` | `{row['psi']:.5f}` | "
+                f"{badge_map[row['status']]} | "
+                f"{row['baseline_mean']:.4f} | {row['current_mean']:.4f} | "
+                f"{'▲' if row['delta_mean'] > 0 else '▼'} {abs(row['delta_mean']):.4f} |"
+            )
+        st.markdown("\n".join(rows_md), unsafe_allow_html=True)
 
     except FileNotFoundError as e:
-        st.warning(str(e))
+        st.warning(f"**Training baseline not found.**  \n{e}  \nRun `python -m ml.train` to generate it.")
     except Exception as e:
-        st.error(f"Error computing drift: {e}")
+        st.error(f"Error: {e}")
