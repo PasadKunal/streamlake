@@ -23,7 +23,7 @@ from confluent_kafka.serialization import StringSerializer
 from dotenv import load_dotenv
 from loguru import logger
 
-from ingestion.schema_registry import USER_EVENT_SCHEMA_PATH
+from ingestion.schema_registry import USER_EVENT_SCHEMA_PATH, get_kafka_sasl_config
 
 load_dotenv()
 
@@ -112,13 +112,13 @@ def run_producer(
             "bootstrap.servers": bootstrap_servers,
             "key.serializer": StringSerializer("utf_8"),
             "value.serializer": avro_serializer,
-            # Idempotent producer — prevents duplicates from retries
             "enable.idempotence": True,
             "acks": "all",
             "retries": 5,
             "max.in.flight.requests.per.connection": 5,
             "linger.ms": 5,
             "batch.size": 65536,
+            **get_kafka_sasl_config(),
         }
     )
 

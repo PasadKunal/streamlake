@@ -11,6 +11,8 @@ from confluent_kafka.admin import AdminClient, NewTopic
 from dotenv import load_dotenv
 from loguru import logger
 
+from ingestion.schema_registry import get_kafka_sasl_config
+
 load_dotenv()
 
 TOPICS = [
@@ -28,7 +30,7 @@ TOPICS = [
 
 
 def create_topics(bootstrap_servers: str) -> None:
-    admin = AdminClient({"bootstrap.servers": bootstrap_servers})
+    admin = AdminClient({"bootstrap.servers": bootstrap_servers, **get_kafka_sasl_config()})
     result = admin.create_topics(TOPICS)
 
     for topic, future in result.items():

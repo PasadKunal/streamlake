@@ -221,6 +221,11 @@ def train(run_name: str = "xgb-churn-v1") -> str:
         baseline_path.write_text(json.dumps(baseline, indent=2))
         mlflow.log_artifact(str(baseline_path), "baseline")
 
+        # Save a copy to disk so the serving layer can load without MLflow
+        model_file = Path("serving/model.xgb")
+        model.save_model(str(model_file))
+        mlflow.log_artifact(str(model_file), "model_file")
+
         # Register model in MLflow Model Registry
         mlflow.xgboost.log_model(
             model,

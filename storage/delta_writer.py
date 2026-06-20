@@ -9,17 +9,19 @@ from deltalake import write_deltalake
 from loguru import logger
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-# Storage options for MinIO (local) or AWS S3 (cloud).
-# All values read from environment so the same code works in both environments.
+# Storage options work for both MinIO (local dev) and AWS S3 (cloud).
+# When AWS_ENDPOINT_URL is set we're talking to a local MinIO instance.
+# When it's absent the standard AWS credential chain is used.
+_endpoint = os.getenv("AWS_ENDPOINT_URL")
 STORAGE_OPTIONS: dict[str, str] = {
-    "AWS_ENDPOINT_URL": os.getenv("AWS_ENDPOINT_URL", "http://localhost:9002"),
-    "AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
-    "AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
-    "AWS_REGION": os.getenv("AWS_DEFAULT_REGION", "us-east-1"),
-    "AWS_ALLOW_HTTP": "true",
-    # Required for MinIO — skips the DynamoDB lock table used by real S3
+    "AWS_ACCESS_KEY_ID":          os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
+    "AWS_SECRET_ACCESS_KEY":      os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
+    "AWS_REGION":                 os.getenv("AWS_DEFAULT_REGION", "us-east-1"),
     "AWS_S3_ALLOW_UNSAFE_RENAME": "true",
 }
+if _endpoint:
+    STORAGE_OPTIONS["AWS_ENDPOINT_URL"] = _endpoint
+    STORAGE_OPTIONS["AWS_ALLOW_HTTP"] = "true"
 
 
 @retry(

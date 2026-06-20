@@ -29,6 +29,7 @@ from pathlib import Path
 import mlflow.xgboost
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from xgboost import XGBClassifier
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel
 from starlette.responses import Response
@@ -74,7 +75,7 @@ def load_models() -> None:
         _models["_champion_version"]   = sorted_versions[-1].version
         _models["_challenger_version"] = sorted_versions[-2].version \
                                          if len(sorted_versions) >= 2 else sorted_versions[-1].version
-        print(f"Models loaded — champion v{_models['_champion_version']}, "
+        print(f"Models loaded from MLflow — champion v{_models['_champion_version']}, "
               f"challenger v{_models['_challenger_version']}")
 
         # Push initial PSI scores to Prometheus
@@ -87,8 +88,18 @@ def load_models() -> None:
             print(f"Drift monitor skipped: {drift_err}")
 
     except Exception as e:
-        print(f"WARNING: Could not load models from registry ({e}). "
-              f"Run python -m ml.train first.")
+        print(f"MLflow registry unavailable ({e}). Trying local model file...")
+        model_file = Path("serving/model.xgb")
+        if model_file.exists():
+            m = XGBClassifier()
+            m.load_model(str(model_file))
+            _models["champion"]   = m
+            _models["challenger"] = m
+            _models["_champion_version"]   = "file"
+            _models["_challenger_version"] = "file"
+            print("Model loaded from serving/model.xgb")
+        else:
+            print("WARNING: No model available. Run python -m ml.train first.")
 
 
 # ── Request / Response schemas ────────────────────────────

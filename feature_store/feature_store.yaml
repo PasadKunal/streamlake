@@ -3,7 +3,10 @@ registry: registry.db
 provider: local
 online_store:
   type: redis
-  connection_string: "localhost:6379"
+  # Local default: localhost:6379
+  # Redis Cloud: redis-host:port,password=xxx,ssl=true
+  # Set REDIS_CONNECTION_STRING in .env to override for cloud deployment.
+  connection_string: "${REDIS_CONNECTION_STRING}"
 offline_store:
   type: file
 entity_key_serialization_version: 2

@@ -74,3 +74,9 @@ feature_store/online_store.db
 
 # Checkpoints
 .checkpoint/
+
+# Streamlit secrets (real values, never commit)
+.streamlit/secrets.toml
+
+# Trained model artifact (large binary, reproduced by ml.train)
+serving/model.xgb

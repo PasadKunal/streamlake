@@ -25,7 +25,7 @@ from confluent_kafka.serialization import StringDeserializer
 from dotenv import load_dotenv
 from loguru import logger
 
-from ingestion.schema_registry import get_avro_deserializer, get_client
+from ingestion.schema_registry import get_avro_deserializer, get_client, get_kafka_sasl_config
 from storage.bronze_schema import BRONZE_SCHEMA
 from storage.delta_writer import write_batch
 
@@ -64,8 +64,8 @@ def run_consumer(
             "key.deserializer": StringDeserializer("utf_8"),
             "value.deserializer": avro_deserializer,
             "auto.offset.reset": "earliest",
-            # Manual commit — only after a successful Delta write
             "enable.auto.commit": False,
+            **get_kafka_sasl_config(),
         }
     )
     consumer.subscribe([topic])

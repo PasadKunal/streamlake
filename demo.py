@@ -18,14 +18,17 @@ st.set_page_config(
 )
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
-STORAGE_OPTIONS = {
-    "AWS_ENDPOINT_URL":           "http://localhost:9002",
-    "AWS_ACCESS_KEY_ID":          "minioadmin",
-    "AWS_SECRET_ACCESS_KEY":      "minioadmin",
-    "AWS_REGION":                 "us-east-1",
-    "AWS_ALLOW_HTTP":             "true",
+
+_endpoint = os.getenv("AWS_ENDPOINT_URL")
+STORAGE_OPTIONS: dict = {
+    "AWS_ACCESS_KEY_ID":          os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
+    "AWS_SECRET_ACCESS_KEY":      os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
+    "AWS_REGION":                 os.getenv("AWS_DEFAULT_REGION", "us-east-1"),
     "AWS_S3_ALLOW_UNSAFE_RENAME": "true",
 }
+if _endpoint:
+    STORAGE_OPTIONS["AWS_ENDPOINT_URL"] = _endpoint
+    STORAGE_OPTIONS["AWS_ALLOW_HTTP"] = "true"
 
 CHART_LAYOUT = dict(
     template="plotly_dark",

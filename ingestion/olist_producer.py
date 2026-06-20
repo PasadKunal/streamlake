@@ -30,12 +30,11 @@ from pathlib import Path
 
 import pandas as pd
 from confluent_kafka import SerializingProducer
-from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.serialization import StringSerializer
 from loguru import logger
 
-from ingestion.schema_registry import USER_EVENT_SCHEMA_PATH
+from ingestion.schema_registry import USER_EVENT_SCHEMA_PATH, get_client, get_kafka_sasl_config
 
 DATA_DIR = Path("data/olist")
 
@@ -178,7 +177,7 @@ def send_to_kafka(
     batch_log_size: int = 5000,
 ) -> None:
     schema_str = USER_EVENT_SCHEMA_PATH.read_text()
-    registry_client = SchemaRegistryClient({"url": schema_registry_url})
+    registry_client = get_client(schema_registry_url)
     avro_serializer = AvroSerializer(registry_client, schema_str, lambda obj, ctx: obj)
 
     producer = SerializingProducer({
@@ -189,6 +188,7 @@ def send_to_kafka(
         "acks":              "all",
         "linger.ms":         10,
         "batch.size":        131072,
+        **get_kafka_sasl_config(),
     })
 
     sent = 0
