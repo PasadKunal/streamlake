@@ -17,7 +17,7 @@ services:
       - key: AWS_SECRET_ACCESS_KEY
         sync: false
       - key: AWS_DEFAULT_REGION
-        value: us-east-1
+        value: us-east-2
       - key: DELTA_BRONZE_PATH
         value: s3://streamlake-bronze/events
       - key: DELTA_SILVER_PATH
