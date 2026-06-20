@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: streamlake-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn serving.app:app --host 0.0.0.0 --port $PORT
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      # Set these in the Render dashboard under Environment
+      - key: REDIS_CONNECTION_STRING
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_DEFAULT_REGION
+        value: us-east-1
+      - key: DELTA_BRONZE_PATH
+        value: s3://streamlake-bronze/events
+      - key: DELTA_SILVER_PATH
+        value: s3://streamlake-silver/events
+      - key: DELTA_GOLD_PATH
+        value: s3://streamlake-gold
+      - key: DELTA_FEATURES_PATH
+        value: s3://streamlake-features

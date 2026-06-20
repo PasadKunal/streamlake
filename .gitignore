@@ -78,5 +78,4 @@ feature_store/online_store.db
 # Streamlit secrets (real values, never commit)
 .streamlit/secrets.toml
 
-# Trained model artifact (large binary, reproduced by ml.train)
-serving/model.xgb
+# model.xgb is committed (284KB) so Render can load it without MLflow
