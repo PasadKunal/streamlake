@@ -185,6 +185,7 @@ This starts: MinIO, Redis, PostgreSQL, Grafana, Prometheus.
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
+| MinIO S3 API | http://localhost:9002 | minioadmin / minioadmin |
 | MinIO Console | http://localhost:9001 | minioadmin / minioadmin |
 | Grafana | http://localhost:3000 | admin / admin |
 | Redis | localhost:6379 | — |

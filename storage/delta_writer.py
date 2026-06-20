@@ -12,7 +12,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 # Storage options for MinIO (local) or AWS S3 (cloud).
 # All values read from environment so the same code works in both environments.
 STORAGE_OPTIONS: dict[str, str] = {
-    "AWS_ENDPOINT_URL": os.getenv("AWS_ENDPOINT_URL", "http://localhost:9000"),
+    "AWS_ENDPOINT_URL": os.getenv("AWS_ENDPOINT_URL", "http://localhost:9002"),
     "AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
     "AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
     "AWS_REGION": os.getenv("AWS_DEFAULT_REGION", "us-east-1"),

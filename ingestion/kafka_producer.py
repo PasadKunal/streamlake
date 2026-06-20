@@ -101,6 +101,7 @@ def run_producer(
     schema_registry_url: str,
     topic: str,
     target_rate: int,
+    max_events: int = 0,
 ) -> None:
     schema_str = USER_EVENT_SCHEMA_PATH.read_text()
     registry_client = SchemaRegistryClient({"url": schema_registry_url})
@@ -127,7 +128,10 @@ def run_producer(
     start = time.monotonic()
     log_every = target_rate * 5  # log throughput every 5 seconds
 
-    logger.info(f"Producer started — target={target_rate} events/sec | topic='{topic}'")
+    logger.info(
+        f"Producer started — target={target_rate} events/sec | topic='{topic}'"
+        + (f" | max_events={max_events:,}" if max_events else "")
+    )
 
     try:
         while True:
@@ -147,6 +151,10 @@ def run_producer(
                     f"Produced {produced:,} events | actual={produced / elapsed:.0f} events/sec"
                     f" | active_sessions={len(active_sessions):,}"
                 )
+
+            if max_events and produced >= max_events:
+                logger.info(f"Reached max_events={max_events:,} — stopping.")
+                break
 
             time.sleep(interval)
 
@@ -177,6 +185,10 @@ if __name__ == "__main__":
         "--schema-registry",
         default=os.getenv("SCHEMA_REGISTRY_URL", "http://localhost:8081"),
     )
+    parser.add_argument(
+        "--max-events", type=int, default=0,
+        help="Stop after this many events (0 = run forever)",
+    )
     args = parser.parse_args()
 
-    run_producer(args.bootstrap_servers, args.schema_registry, args.topic, args.rate)
+    run_producer(args.bootstrap_servers, args.schema_registry, args.topic, args.rate, args.max_events)

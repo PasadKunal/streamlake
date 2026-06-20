@@ -1,5 +1,3 @@
-version: "3.9"
-
 # StreamLake Local Development Stack
 # Services added per phase:
 #   Phase 0: MinIO, Redis, PostgreSQL, Grafana, Prometheus
@@ -26,7 +24,7 @@ services:
     image: minio/minio:RELEASE.2024-04-06T05-26-02Z
     container_name: streamlake-minio
     ports:
-      - "9000:9000"   # S3 API
+      - "9002:9000"   # S3 API  (host 9002 → container 9000)
       - "9001:9001"   # Web console
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
@@ -36,24 +34,20 @@ services:
       - minio_data:/data
     networks:
       - streamlake
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
-  # Creates the default bucket on startup
+  # Creates the default buckets on startup — retries until MinIO is ready
   minio-init:
-    image: minio/mc:RELEASE.2024-04-06T16-17-45Z
+    image: minio/mc:latest
     container_name: streamlake-minio-init
     depends_on:
-      minio:
-        condition: service_healthy
+      - minio
     networks:
       - streamlake
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin};
+      until mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin} 2>/dev/null; do
+        echo 'Waiting for MinIO...'; sleep 2;
+      done;
       mc mb --ignore-existing local/streamlake-bronze;
       mc mb --ignore-existing local/streamlake-silver;
       mc mb --ignore-existing local/streamlake-gold;
