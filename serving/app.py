@@ -55,17 +55,6 @@ _models: dict[str, object] = {}
 
 @app.on_event("startup")
 def load_models() -> None:
-    # Register Feast feature views so Redis online store lookups work.
-    # This is idempotent — safe to run on every cold start.
-    try:
-        from feast import FeatureStore
-        from feature_store.feature_repo import user, user_activity_features
-        store = FeatureStore(repo_path="feature_store")
-        store.apply([user, user_activity_features])
-        print("Feast registry applied")
-    except Exception as feast_err:
-        print(f"Feast registry apply failed: {feast_err}")
-
     mlflow.set_tracking_uri(MLFLOW_URI)
     client = mlflow.MlflowClient()
 

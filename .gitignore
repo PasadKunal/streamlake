@@ -68,7 +68,7 @@ tmp/
 temp/
 
 # Feast generated files
-feature_store/registry.db
+# registry.db is committed (988B, schema only, no secrets)
 feature_store/data/
 feature_store/online_store.db
 
