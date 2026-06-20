@@ -50,7 +50,13 @@ FEATURE_COLS = [
     "session_count_24h",
     "event_count_24h",
     "days_since_last_purchase",
+    # Olist enrichment features (joined from CSV if available)
+    "avg_delivery_delay_days",
+    "avg_review_score",
+    "avg_payment_installments",
 ]
+
+ENRICHMENT_PATH = Path("feature_store/data/olist_enrichment.parquet")
 
 
 OLIST_ORDERS_PATH    = Path("data/olist/olist_orders_dataset.csv")
@@ -95,8 +101,19 @@ def _olist_churn_labels() -> pd.Series | None:
 
 
 def build_training_data() -> tuple[pd.DataFrame, pd.Series]:
-    """Load Phase 4 features and derive churn label."""
+    """Load Phase 4 features, join Olist enrichment if available, derive churn label."""
     df = pd.read_parquet(PARQUET_PATH)
+
+    # Join enrichment features when available (delivery delay, review score, installments)
+    available_features = [c for c in FEATURE_COLS if c in df.columns]
+    if ENRICHMENT_PATH.exists():
+        enrichment = pd.read_parquet(ENRICHMENT_PATH)
+        df = df.merge(enrichment, on="user_id", how="left")
+        new_cols = [c for c in FEATURE_COLS if c in enrichment.columns]
+        available_features = [c for c in FEATURE_COLS if c in df.columns]
+        print(f"  Enrichment joined: {new_cols}")
+
+    active_features = [c for c in FEATURE_COLS if c in df.columns]
 
     olist_labels = _olist_churn_labels()
 
@@ -112,11 +129,9 @@ def build_training_data() -> tuple[pd.DataFrame, pd.Series]:
               f"(churn rate {y.mean():.1%})")
     else:
         # Synthetic data fallback: use recency threshold.
-        # days_since_last_purchase is excluded from FEATURE_COLS above to
-        # avoid circular leakage when this branch is active.
         y = (df["days_since_last_purchase"] > 7).astype(int)
 
-    return df[FEATURE_COLS].copy(), y
+    return df[active_features].copy(), y
 
 
 def train(run_name: str = "xgb-churn-v1") -> str:
@@ -176,7 +191,7 @@ def train(run_name: str = "xgb-churn-v1") -> str:
         mlflow.log_metrics(metrics)
 
         # Feature importance (XGBoost gain)
-        importance = dict(zip(FEATURE_COLS, model.feature_importances_))
+        importance = dict(zip(list(X_train.columns), model.feature_importances_))
         for feat, imp in importance.items():
             mlflow.log_metric(f"importance_{feat}", round(float(imp), 6))
 
@@ -189,15 +204,18 @@ def train(run_name: str = "xgb-churn-v1") -> str:
             "n_samples":   len(X_train),
             "features":    {},
         }
-        for feat in FEATURE_COLS:
+        for feat in X_train.columns:
             vals = X_train[feat].values.astype(float)
-            counts, edges = np.histogram(vals, bins=10)
+            vals_clean = vals[~np.isnan(vals)]
+            if len(vals_clean) == 0:
+                continue
+            counts, edges = np.histogram(vals_clean, bins=10)
             baseline["features"][feat] = {
                 "bin_edges":  edges.tolist(),
                 "bin_counts": counts.tolist(),
-                "mean": round(float(vals.mean()), 6),
-                "std":  round(float(vals.std()),  6),
-                "p50":  round(float(np.median(vals)), 6),
+                "mean": round(float(np.nanmean(vals)), 6),
+                "std":  round(float(np.nanstd(vals)),  6),
+                "p50":  round(float(np.nanmedian(vals)), 6),
             }
         baseline_path = Path("serving/training_baseline.json")
         baseline_path.write_text(json.dumps(baseline, indent=2))
