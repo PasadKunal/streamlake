@@ -114,7 +114,7 @@ A production-grade, self-hosted data platform that unifies real-time event inges
 - [x] **Phase 2** — Bronze → Silver: watermark tracking, dedup, Great Expectations, quarantine routing
 - [x] **Phase 3** — Silver → Gold: DuckDB aggregations (DAU, revenue, funnel, churn signals), Airflow DAG
 - [x] **Phase 4** — ML Feature Store: Feast + DuckDB rolling windows + Redis online + Delta offline
-- [ ] **Phase 5** — ML Loop: XGBoost + MLflow + FastAPI inference + SHAP + A/B testing
+- [x] **Phase 5** — ML Loop: XGBoost + MLflow + FastAPI inference + SHAP + A/B testing
 - [ ] **Phase 6** — Observability: PSI drift monitoring, Grafana dashboards, Locust load tests
 
 ---
@@ -455,6 +455,81 @@ pytest tests/feature_store/ -v   # 19 tests, all pass
 | Redis online store | 3,940 users | Zero null values |
 | MinIO Delta | 3,940 rows | Audit trail, time-travel |
 | **Tests** | **105 / 105** | Across all 4 phases |
+
+---
+
+## Phase 5 — ML Loop
+
+### What was built
+
+| File | Purpose |
+|------|---------|
+| [ml/train.py](ml/train.py) | XGBoost churn model — trains, logs metrics + SHAP to MLflow, registers in model registry |
+| [ml/shap_explainer.py](ml/shap_explainer.py) | SHAP `TreeExplainer` — global summary plot (MLflow artifact) + per-prediction top-3 features |
+| [ml/ab_splitter.py](ml/ab_splitter.py) | Deterministic Champion/Challenger split via MD5 hash (90/10, no DB needed) |
+| [serving/app.py](serving/app.py) | FastAPI inference API — `/predict`, `/features/{user_id}`, `/model/info`, `/health` |
+| [verify_ml.py](verify_ml.py) | End-to-end verification: registry, predictions, SHAP, A/B split stats |
+| [tests/ml/test_train.py](tests/ml/test_train.py) | Unit tests — training data shape, binary labels, null safety |
+| [tests/ml/test_ab_splitter.py](tests/ml/test_ab_splitter.py) | Unit tests — determinism, 90/10 distribution across 5,000 users |
+
+### API
+
+Start:
+```bash
+uvicorn serving.app:app --reload --port 8000
+```
+
+**`POST /predict`** — churn score + SHAP explanation + A/B group:
+```bash
+curl -X POST http://localhost:8000/predict \
+     -H 'Content-Type: application/json' \
+     -d '{"user_id": "USER-006775"}'
+```
+```json
+{
+  "user_id": "USER-006775",
+  "churn_probability": 0.0126,
+  "churn_prediction": false,
+  "model_version": "1",
+  "ab_group": "champion",
+  "top_features": [
+    {"feature": "purchase_count_1h",  "shap_value": -3.3408, "direction": "decreases_churn"},
+    {"feature": "purchase_count_24h", "shap_value": -0.9221, "direction": "decreases_churn"},
+    {"feature": "purchase_count_7d",  "shap_value": -0.0304, "direction": "decreases_churn"}
+  ],
+  "features_used": { "purchase_count_1h": 1, "days_since_last_purchase": 0, "..." : "..." }
+}
+```
+
+### Running Phase 5 locally
+
+```bash
+source .venv/bin/activate
+
+# 1. Train model (logs to MLflow, registers in model registry)
+python -m ml.train
+
+# 2. Verify model, SHAP, A/B split (no server required)
+python verify_ml.py
+
+# 3. Start inference API
+uvicorn serving.app:app --reload --port 8000
+
+# 4. Run all tests
+pytest tests/ -v   # 122 tests, all pass
+```
+
+### Results
+
+| Check | Result |
+|-------|--------|
+| Model AUC | 1.0 (label derived from features — expected for demo) |
+| Users scored | 3,940 |
+| High-risk (≥0.70) | 3,825 (97.1% — users who never purchased) |
+| Low-risk (<0.30) | 115 (2.9% — active purchasers) |
+| A/B split | 90.3% champion / 9.7% challenger across 3,940 users |
+| API latency | < 50ms (feature fetch from Redis + model inference + SHAP) |
+| **Tests** | **122 / 122** across all 5 phases |
 
 ---
 
