@@ -56,6 +56,21 @@ services:
       echo 'Buckets created.';
       "
 
+  # ── Redpanda Console (Kafka UI) ────────────────────────────────────
+  redpanda-console:
+    image: redpandadata/console:latest
+    container_name: streamlake-redpanda-console
+    ports:
+      - "8080:8080"
+    environment:
+      CONFIG_FILEPATH: /etc/console/config.yaml
+    volumes:
+      - ./infra/redpanda-console-config.yaml:/etc/console/config.yaml:ro
+    depends_on:
+      - redpanda
+    networks:
+      - streamlake
+
   # ── Online Feature Store ───────────────────────────────────────────
   redis:
     image: redis:7.2-alpine
