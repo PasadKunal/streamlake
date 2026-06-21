@@ -24,7 +24,7 @@ def _secret(key: str, default: str = "") -> str:
     except Exception:
         return os.getenv(key, default)
 
-API_URL = _secret("API_URL", "http://localhost:8000")
+API_URL = _secret("API_URL", "https://streamlake.onrender.com")
 API_KEY = _secret("STREAMLAKE_API_KEY", "sk-demo-streamlake")
 _API_HEADERS = {"X-Api-Key": API_KEY}
 
@@ -972,26 +972,30 @@ border-left:4px solid {color};border-radius:14px;padding:1rem 1.3rem;">
     st.markdown('<div class="section-hdr"><span>Try the API</span></div>',
                 unsafe_allow_html=True)
 
-    api_col1, api_col2 = st.columns(2)
-
-    with api_col1:
-        st.markdown(
-            '<div style="font-weight:700;color:#0f172a;font-size:0.88rem;'
-            'margin-bottom:0.5rem;">Score a customer</div>',
-            unsafe_allow_html=True,
+    def _api_card(label, cmd):
+        safe = cmd.replace("&", "&amp;")
+        return (
+            f'<div style="background:#1e293b;border-radius:14px;padding:1.2rem 1.4rem;">'
+            f'<div style="font-size:0.65rem;font-weight:700;color:#64748b;text-transform:uppercase;'
+            f'letter-spacing:0.12em;margin-bottom:0.85rem;">{label}</div>'
+            f'<pre style="margin:0;color:#e2e8f0;font-size:0.74rem;line-height:1.85;'
+            f'white-space:pre;overflow-x:auto;'
+            f'font-family:\'SFMono-Regular\',\'Consolas\',\'Menlo\',monospace;">{safe}</pre>'
+            f'</div>'
         )
-        st.code(f"""curl -s -X POST {API_URL}/predict \\
+
+    _predict = f"""curl -s -X POST {API_URL}/predict \\
   -H "Content-Type: application/json" \\
   -H "X-Api-Key: sk-demo-streamlake" \\
   -d '{{"user_id": "USER-006775"}}' \\
-  | python3 -m json.tool""", language="bash")
+  | python3 -m json.tool"""
 
-        st.markdown(
-            '<div style="font-weight:700;color:#0f172a;font-size:0.88rem;'
-            'margin:1rem 0 0.5rem;">Push a Shopify order</div>',
-            unsafe_allow_html=True,
-        )
-        st.code(f"""curl -s -X POST \\
+    _alerts = f"""curl -s \\
+  "{API_URL}/alerts?threshold=0.7&limit=10" \\
+  -H "X-Api-Key: sk-demo-streamlake" \\
+  | python3 -m json.tool"""
+
+    _webhook = f"""curl -s -X POST \\
   "{API_URL}/ingest/webhook?source=shopify" \\
   -H "Content-Type: application/json" \\
   -H "X-Api-Key: sk-demo-streamlake" \\
@@ -1002,31 +1006,25 @@ border-left:4px solid {color};border-radius:14px;padding:1rem 1.3rem;">
     "total_price": "149.99",
     "line_items": [{{"product_id": 7}}],
     "billing_address": {{"country_code": "US"}}
-  }}'""", language="bash")
+  }}'"""
 
-    with api_col2:
-        st.markdown(
-            '<div style="font-weight:700;color:#0f172a;font-size:0.88rem;'
-            'margin-bottom:0.5rem;">Get at-risk customers</div>',
-            unsafe_allow_html=True,
-        )
-        st.code(f"""curl -s \\
-  "{API_URL}/alerts?threshold=0.7&limit=10" \\
-  -H "X-Api-Key: sk-demo-streamlake" \\
-  | python3 -m json.tool""", language="bash")
-
-        st.markdown(
-            '<div style="font-weight:700;color:#0f172a;font-size:0.88rem;'
-            'margin:1rem 0 0.5rem;">Upload a CSV</div>',
-            unsafe_allow_html=True,
-        )
-        st.code(f"""curl -s -X POST {API_URL}/ingest/csv \\
+    _csv = f"""curl -s -X POST {API_URL}/ingest/csv \\
   -H "X-Api-Key: sk-demo-streamlake" \\
   -F "file=@orders.csv"
 
 # orders.csv columns:
 # order_id, customer_id, total_amount,
-# order_date, product_id, country""", language="bash")
+# order_date, product_id, country"""
+
+    st.markdown(
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">'
+        + _api_card("Score a customer", _predict)
+        + _api_card("Get at-risk customers", _alerts)
+        + _api_card("Push a Shopify order", _webhook)
+        + _api_card("Upload a CSV", _csv)
+        + '</div>',
+        unsafe_allow_html=True,
+    )
 
     st.markdown('<div class="section-hdr"><span>Data Volumes (full pipeline run)</span></div>',
                 unsafe_allow_html=True)
