@@ -480,37 +480,33 @@ with tab1:
     st.markdown('<div class="section-hdr"><span>Data Flow</span></div>',
                 unsafe_allow_html=True)
 
-    st.markdown("""
-<div style="background:#ffffff;border:1px solid #e0e7ff;border-radius:16px;
-padding:1.6rem 1.8rem;font-family:monospace;font-size:0.78rem;color:#475569;
-line-height:2;overflow-x:auto;">
-
-<span style="color:#6366f1;font-weight:700;">INGEST</span>
-&nbsp;&nbsp; Kafka / Redpanda &rarr; Avro + Schema Registry &nbsp; ~1,400 events/s
-&nbsp;&nbsp; REST Webhook &rarr; POST /ingest/webhook (Shopify / WooCommerce)
-&nbsp;&nbsp; CSV Upload &nbsp;&rarr; POST /ingest/csv
-
-<span style="color:#f59e0b;font-weight:700;">BRONZE</span>
-&nbsp;&nbsp; s3://streamlake-bronze/events/ &nbsp; raw, immutable, partitioned by date
-&nbsp;&nbsp; Delta Lake (delta-rs, no Spark) &nbsp; idempotent consumer
-
-<span style="color:#8b5cf6;font-weight:700;">SILVER</span>
-&nbsp;&nbsp; Event-time watermarks &middot; LRU dedup (1h TTL)
-&nbsp;&nbsp; 6 Great Expectations rules &middot; quarantine side-output
-
-<span style="color:#10b981;font-weight:700;">GOLD &nbsp;</span>
-&nbsp;&nbsp; DuckDB aggregations &rarr; DAU, revenue, funnel, user signals
-
-<span style="color:#06b6d4;font-weight:700;">FEATURES</span>
-&nbsp;&nbsp; Feast 0.39 &rarr; Redis online store (sub-10ms retrieval)
-&nbsp;&nbsp; 9 rolling features: purchases &amp; revenue over 1h / 24h / 7d
-
-<span style="color:#ef4444;font-weight:700;">SERVE</span>
-&nbsp;&nbsp; POST /predict &rarr; XGBoost &middot; SHAP &middot; 90/10 A/B &middot; Prometheus
-&nbsp;&nbsp; GET  /alerts &nbsp;&rarr; Redis sorted-set range query (O log N)
-
-</div>
-""", unsafe_allow_html=True)
+    st.code("""\
+INGEST   Kafka / Redpanda  ->  Avro + Schema Registry   ~1,400 events/s
+         REST Webhook       ->  POST /ingest/webhook (Shopify / WooCommerce)
+         CSV Upload         ->  POST /ingest/csv
+              |
+              v
+BRONZE   s3://streamlake-bronze/events/   raw, immutable, partitioned by date
+         Delta Lake (delta-rs)  ·  idempotent consumer  ·  at-least-once delivery
+              |
+              v  watermark / dedup / Great Expectations / quarantine router
+SILVER   s3://streamlake-silver/events/   validated, deduplicated
+         Event-time watermarks  ·  LRU dedup 1h TTL  ·  6 GE rules
+              |
+         -----+---------------------
+         |                         |
+         v                         v
+GOLD     DuckDB aggregations    FEATURES  Feast 0.39 -> Redis online store
+         DAU / Revenue / Funnel           9 rolling features per user
+         user_signals table               purchases & revenue 1h / 24h / 7d
+                                          Retrieved in <10ms at inference time
+                                    |
+                                    v
+                             XGBoost /predict
+                             SHAP explanations  ·  90/10 A/B split
+                             Prometheus metrics  ·  PSI drift detection
+                             GET /alerts  ->  Redis sorted-set O(log N)
+""", language="text")
 
 
 # =============================================================================
@@ -521,7 +517,9 @@ with tab2:
     st.markdown("""
 <div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:14px;
 padding:1rem 1.3rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12px;">
-  <div style="font-size:1.3rem;"></div>
+  <div style="width:30px;height:30px;background:#6366f1;border-radius:8px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:0.85rem;font-weight:900;color:#fff;">i</div>
   <div style="font-size:0.84rem;color:#4338ca;line-height:1.6;">
     Features are fetched live from <strong>Redis</strong> in under 10ms.
     The model runs <strong>SHAP</strong> to explain every score.
@@ -814,37 +812,59 @@ with tab4:
     st.markdown('<div class="section-hdr"><span>Architecture</span></div>',
                 unsafe_allow_html=True)
 
-    st.markdown("""
-<div style="background:#ffffff;border:1px solid #e0e7ff;border-radius:16px;
-padding:1.6rem 1.8rem;font-family:monospace;font-size:0.78rem;color:#475569;
-line-height:2;overflow-x:auto;">
+    def _layer(color, bg, border, label, path, bullets):
+        items = "".join(
+            f'<li style="margin:0;padding:0;">{b}</li>' for b in bullets
+        )
+        return f"""
+<div style="background:{bg};border:1px solid {border};border-left:4px solid {color};
+border-radius:12px;padding:1rem 1.2rem;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.5rem;flex-wrap:wrap;">
+    <span style="background:{color};color:#fff;font-size:0.62rem;font-weight:700;
+    padding:2px 9px;border-radius:4px;text-transform:uppercase;letter-spacing:0.1em;
+    white-space:nowrap;">{label}</span>
+    <code style="font-size:0.72rem;color:{color};background:rgba(0,0,0,0.04);
+    padding:1px 6px;border-radius:4px;">{path}</code>
+  </div>
+  <ul style="margin:0;padding-left:1.2rem;font-size:0.81rem;color:#475569;line-height:1.8;">
+    {items}
+  </ul>
+</div>"""
 
-<span style="color:#6366f1;font-weight:700;">INGEST</span>
-&nbsp;&nbsp; Kafka / Redpanda &nbsp;&rarr;&nbsp; Avro + Schema Registry &nbsp; ~1,400 events/s
-&nbsp;&nbsp; REST webhook &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr;&nbsp; POST /ingest/webhook?source=shopify|woocommerce
-&nbsp;&nbsp; CSV upload &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr;&nbsp; POST /ingest/csv
+    arrow = '<div style="text-align:center;font-size:1.2rem;color:#c7d2fe;padding:2px 0;">&#8595;</div>'
 
-<span style="color:#f59e0b;font-weight:700;">BRONZE</span> &nbsp; s3://streamlake-bronze/events/{tenant}/
-&nbsp;&nbsp; Raw, immutable events in Delta Lake (delta-rs, no Spark)
-&nbsp;&nbsp; Partitioned by ingestion_date &middot; idempotent consumer
-
-<span style="color:#8b5cf6;font-weight:700;">SILVER</span> &nbsp; s3://streamlake-silver/events/
-&nbsp;&nbsp; Event-time watermarks &middot; LRU dedup (1h TTL)
-&nbsp;&nbsp; 6 Great Expectations rules &middot; quarantine side-output
-
-<span style="color:#10b981;font-weight:700;">GOLD &nbsp;</span> &nbsp; s3://streamlake-gold/
-&nbsp;&nbsp; DuckDB aggregations: DAU, revenue, funnel, user_signals
-
-<span style="color:#06b6d4;font-weight:700;">FEATURES</span> s3://streamlake-features/ + Redis (Feast online store)
-&nbsp;&nbsp; 9 rolling features per user: purchases &amp; revenue over 1h / 24h / 7d
-&nbsp;&nbsp; Retrieved in &lt;10ms at inference time
-
-<span style="color:#ef4444;font-weight:700;">SERVE</span>
-&nbsp;&nbsp; POST /predict &nbsp;&rarr;&nbsp; XGBoost &middot; SHAP &middot; 90/10 A/B split &middot; Prometheus
-&nbsp;&nbsp; GET  /alerts &nbsp;&nbsp;&rarr;&nbsp; Redis sorted-set range query (O log N)
-
-</div>
-""", unsafe_allow_html=True)
+    st.markdown(
+        _layer("#6366f1","#eef2ff","#c7d2fe","Ingest","Kafka / Redpanda + REST + CSV",[
+            "Kafka/Redpanda &rarr; Avro + Schema Registry &nbsp; ~1,400 events/s",
+            "POST /ingest/webhook?source=shopify|woocommerce",
+            "POST /ingest/csv &nbsp; (multipart file upload)",
+        ]) + arrow +
+        _layer("#f59e0b","#fffbeb","#fde68a","Bronze","s3://streamlake-bronze/events/{tenant}/",[
+            "Raw, immutable events in Delta Lake (delta-rs &mdash; no Spark or JVM)",
+            "Partitioned by <code>ingestion_date</code> &nbsp;&middot;&nbsp; idempotent consumer",
+            "At-least-once delivery &nbsp;&middot;&nbsp; tenant-namespaced S3 prefix",
+        ]) + arrow +
+        _layer("#8b5cf6","#f5f3ff","#ddd6fe","Silver","s3://streamlake-silver/events/",[
+            "Event-time watermarks &nbsp;&middot;&nbsp; LRU dedup with 1h TTL",
+            "6 Great Expectations validation rules",
+            "Bad records routed to quarantine side-output",
+        ]) + arrow +
+        _layer("#10b981","#ecfdf5","#a7f3d0","Gold","s3://streamlake-gold/",[
+            "DuckDB aggregations: DAU, revenue, funnel, user_signals",
+            "Per-user behavioral signals (purchase frequency, spend windows)",
+        ]) + arrow +
+        _layer("#06b6d4","#ecfeff","#a5f3fc","Features","s3://streamlake-features/ + Redis",[
+            "Feast 0.39 materializes Gold &rarr; Redis online store",
+            "9 rolling features per user: purchases &amp; revenue over 1h / 24h / 7d",
+            "Retrieved in &lt;10ms at inference time (no S3 call at serve time)",
+        ]) + arrow +
+        _layer("#ef4444","#fef2f2","#fecaca","Serve","https://streamlake.onrender.com",[
+            "POST /predict &rarr; XGBoost &middot; SHAP explanations &middot; 90/10 A/B split",
+            "GET /alerts &rarr; Redis sorted-set range query O(log N)",
+            "Prometheus metrics &middot; PSI drift detection &middot; outbound webhooks",
+        ]),
+        unsafe_allow_html=True,
+    )
 
     st.markdown('<div class="section-hdr"><span>Key Design Decisions</span></div>',
                 unsafe_allow_html=True)
@@ -854,7 +874,10 @@ line-height:2;overflow-x:auto;">
     with d1:
         st.markdown("""
 <div class="how-card">
-  <div class="how-icon"></div>
+  <div style="width:38px;height:38px;background:#fffbeb;border:1.5px solid #fde68a;
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-size:0.75rem;font-weight:800;color:#f59e0b;margin-bottom:0.9rem;
+  letter-spacing:0.02em;">S3</div>
   <div class="how-title" style="color:#f59e0b;">Delta Lake on S3</div>
   <div class="how-body">
     Chose <strong>delta-rs</strong> (Rust) over PySpark so the entire pipeline
@@ -867,7 +890,10 @@ line-height:2;overflow-x:auto;">
     with d2:
         st.markdown("""
 <div class="how-card">
-  <div class="how-icon"></div>
+  <div style="width:38px;height:38px;background:#ecfeff;border:1.5px solid #a5f3fc;
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-size:0.75rem;font-weight:800;color:#06b6d4;margin-bottom:0.9rem;
+  letter-spacing:0.02em;">RD</div>
   <div class="how-title" style="color:#06b6d4;">Feast + Redis Feature Store</div>
   <div class="how-body">
     Features are pre-computed in batch (Gold pipeline) and pushed to
@@ -880,7 +906,10 @@ line-height:2;overflow-x:auto;">
     with d3:
         st.markdown("""
 <div class="how-card">
-  <div class="how-icon"></div>
+  <div style="width:38px;height:38px;background:#ecfdf5;border:1.5px solid #a7f3d0;
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-size:0.75rem;font-weight:800;color:#10b981;margin-bottom:0.9rem;
+  letter-spacing:0.02em;">ML</div>
   <div class="how-title" style="color:#10b981;">SHAP + PSI Observability</div>
   <div class="how-body">
     Every prediction returns <strong>SHAP values</strong> so the score is
@@ -895,7 +924,10 @@ line-height:2;overflow-x:auto;">
     with d4:
         st.markdown("""
 <div class="how-card">
-  <div class="how-icon"></div>
+  <div style="width:38px;height:38px;background:#eef2ff;border:1.5px solid #c7d2fe;
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-size:0.75rem;font-weight:800;color:#6366f1;margin-bottom:0.9rem;
+  letter-spacing:0.02em;">KY</div>
   <div class="how-title" style="color:#6366f1;">Multi-Tenant API Keys</div>
   <div class="how-body">
     Each tenant authenticates with an <code>X-Api-Key</code> header. Ingested
@@ -908,7 +940,10 @@ line-height:2;overflow-x:auto;">
     with d5:
         st.markdown("""
 <div class="how-card">
-  <div class="how-icon"></div>
+  <div style="width:38px;height:38px;background:#f5f3ff;border:1.5px solid #ddd6fe;
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-size:0.75rem;font-weight:800;color:#8b5cf6;margin-bottom:0.9rem;
+  letter-spacing:0.02em;">A/B</div>
   <div class="how-title" style="color:#8b5cf6;">90 / 10 A/B Split</div>
   <div class="how-body">
     Each <code>/predict</code> call hashes the <code>user_id</code> to assign
@@ -921,7 +956,10 @@ line-height:2;overflow-x:auto;">
     with d6:
         st.markdown("""
 <div class="how-card">
-  <div class="how-icon"></div>
+  <div style="width:38px;height:38px;background:#fef2f2;border:1.5px solid #fecaca;
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-size:0.75rem;font-weight:800;color:#ef4444;margin-bottom:0.9rem;
+  letter-spacing:0.02em;">WH</div>
   <div class="how-title" style="color:#ef4444;">Fire-and-Forget Webhooks</div>
   <div class="how-body">
     When churn probability exceeds the alert threshold, <code>/predict</code>
