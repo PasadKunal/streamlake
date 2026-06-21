@@ -24,12 +24,10 @@ STORAGE_OPTIONS: dict[str, str] = {
     "AWS_S3_ALLOW_UNSAFE_RENAME": "true",
 }
 if _endpoint:
-    # Local MinIO
     STORAGE_OPTIONS["AWS_ENDPOINT_URL"] = _endpoint
-    STORAGE_OPTIONS["AWS_ALLOW_HTTP"] = "true"
-elif _region != "us-east-1":
-    # delta-rs doesn't follow S3 redirects; use the regional endpoint directly
-    STORAGE_OPTIONS["AWS_ENDPOINT_URL"] = f"https://s3.{_region}.amazonaws.com"
+    if _endpoint.startswith("http://"):
+        # Plain HTTP only needed for local MinIO; real S3 endpoints use HTTPS
+        STORAGE_OPTIONS["AWS_ALLOW_HTTP"] = "true"
 
 
 @retry(

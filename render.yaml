@@ -18,6 +18,8 @@ services:
         sync: false
       - key: AWS_DEFAULT_REGION
         value: us-east-2
+      - key: AWS_ENDPOINT_URL
+        value: https://s3.us-east-2.amazonaws.com
       - key: DELTA_BRONZE_PATH
         value: s3://streamlake-bronze/events
       - key: DELTA_SILVER_PATH
