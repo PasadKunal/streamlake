@@ -141,9 +141,12 @@ def metrics():
 
 @app.get("/health")
 def health():
+    from storage.delta_writer import STORAGE_OPTIONS
     return {
         "status":        "ok",
         "models_loaded": list(k for k in _models if not k.startswith("_")),
+        "s3_endpoint":   STORAGE_OPTIONS.get("AWS_ENDPOINT_URL", "not set"),
+        "s3_region":     STORAGE_OPTIONS.get("AWS_REGION", "not set"),
     }
 
 
