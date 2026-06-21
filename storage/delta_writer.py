@@ -6,22 +6,30 @@ import os
 
 import pyarrow as pa
 from deltalake import write_deltalake
+from dotenv import load_dotenv
 from loguru import logger
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+load_dotenv()  # ensure .env is loaded before reading storage config
 
 # Storage options work for both MinIO (local dev) and AWS S3 (cloud).
 # When AWS_ENDPOINT_URL is set we're talking to a local MinIO instance.
 # When it's absent the standard AWS credential chain is used.
 _endpoint = os.getenv("AWS_ENDPOINT_URL")
+_region   = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 STORAGE_OPTIONS: dict[str, str] = {
     "AWS_ACCESS_KEY_ID":          os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
     "AWS_SECRET_ACCESS_KEY":      os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
-    "AWS_REGION":                 os.getenv("AWS_DEFAULT_REGION", "us-east-1"),
+    "AWS_REGION":                 _region,
     "AWS_S3_ALLOW_UNSAFE_RENAME": "true",
 }
 if _endpoint:
+    # Local MinIO
     STORAGE_OPTIONS["AWS_ENDPOINT_URL"] = _endpoint
     STORAGE_OPTIONS["AWS_ALLOW_HTTP"] = "true"
+elif _region != "us-east-1":
+    # delta-rs doesn't follow S3 redirects; use the regional endpoint directly
+    STORAGE_OPTIONS["AWS_ENDPOINT_URL"] = f"https://s3.{_region}.amazonaws.com"
 
 
 @retry(
