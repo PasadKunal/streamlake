@@ -38,6 +38,7 @@ from feature_store.offline_store import FEATURE_REFS, get_online_features
 from ml.ab_splitter import assign as ab_assign
 from ml.shap_explainer import explain_prediction
 from ml.train import EXPERIMENT, FEATURE_COLS, MODEL_NAME, MLFLOW_URI
+from serving.ingest_router import router as ingest_router
 from serving.metrics import (
     CHURN_PROBABILITY, DRIFT_ALERT, FEATURE_PSI,
     PREDICTION_LATENCY, PREDICTIONS_TOTAL,
@@ -45,9 +46,11 @@ from serving.metrics import (
 
 app = FastAPI(
     title="StreamLake Churn Prediction API",
-    description="Real-time churn probability scoring with SHAP explanations",
+    description="Real-time churn probability scoring with SHAP explanations. Accepts order data via webhook or CSV upload.",
     version="1.0.0",
 )
+
+app.include_router(ingest_router)
 
 # Models loaded once at startup
 _models: dict[str, object] = {}
