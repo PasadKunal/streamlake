@@ -38,7 +38,9 @@ from feature_store.offline_store import FEATURE_REFS, get_online_features
 from ml.ab_splitter import assign as ab_assign
 from ml.shap_explainer import explain_prediction
 from ml.train import EXPERIMENT, FEATURE_COLS, MODEL_NAME, MLFLOW_URI
+from serving.alert_store import get_alerts, record_score, total_scored
 from serving.ingest_router import router as ingest_router
+from serving.outbound import build_alert_payload, fire_webhook
 from serving.metrics import (
     CHURN_PROBABILITY, DRIFT_ALERT, FEATURE_PSI,
     PREDICTION_LATENCY, PREDICTIONS_TOTAL,
@@ -109,6 +111,8 @@ def load_models() -> None:
 
 class PredictRequest(BaseModel):
     user_id: str
+    alert_webhook_url: str | None = None
+    alert_threshold: float = 0.7
 
 
 class FeatureExplanation(BaseModel):
@@ -217,6 +221,23 @@ def predict(request: PredictRequest):
     top_features = explain_prediction(model, X)
     latency = time.perf_counter() - t0
 
+    # Track score in Redis sorted set (powers GET /alerts)
+    record_score(request.user_id, prob)
+
+    # Outbound webhook — fire-and-forget, never blocks the response
+    if request.alert_webhook_url and prob >= request.alert_threshold:
+        fire_webhook(
+            request.alert_webhook_url,
+            build_alert_payload(
+                user_id=request.user_id,
+                churn_probability=round(prob, 4),
+                churn_prediction=prediction,
+                model_version=model_version,
+                ab_group=ab_group,
+                top_features=top_features,
+            ),
+        )
+
     # Prometheus instrumentation
     PREDICTIONS_TOTAL.labels(
         model_version=model_version,
@@ -235,3 +256,74 @@ def predict(request: PredictRequest):
         top_features=[FeatureExplanation(**f) for f in top_features],
         features_used=X.iloc[0].to_dict(),
     )
+
+
+# ── Alerts ─────────────────────────────────────────────────────────────────
+
+class RefreshRequest(BaseModel):
+    user_ids: list[str]
+    threshold: float = 0.7
+
+
+@app.get("/alerts")
+def alerts(threshold: float = 0.7, limit: int = 100):
+    """
+    Return users whose churn probability >= threshold.
+    Scores are written to Redis on every /predict call, so this is always O(log N).
+    """
+    try:
+        results = get_alerts(threshold=threshold, limit=limit)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    return {
+        "threshold":     threshold,
+        "total_at_risk": len(results),
+        "total_scored":  total_scored(),
+        "users":         results,
+    }
+
+
+@app.post("/alerts/refresh")
+def refresh_alerts(body: RefreshRequest):
+    """
+    Batch-score a list of user_ids and populate the churn_scores sorted set.
+    Useful for proactively checking a cohort rather than waiting for /predict calls.
+    """
+    if not _models:
+        raise HTTPException(status_code=503, detail="Models not loaded")
+    if not body.user_ids:
+        raise HTTPException(status_code=400, detail="user_ids must not be empty")
+
+    model = _models.get("champion")
+    scored, failed = 0, 0
+
+    try:
+        feat_df = get_online_features(body.user_ids)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Feature retrieval failed: {e}")
+
+    for uid in body.user_ids:
+        row = feat_df[feat_df["user_id"] == uid]
+        if row.empty:
+            failed += 1
+            continue
+        available = [c for c in FEATURE_COLS if c in row.columns]
+        X = row[available].fillna(0)
+        for col in FEATURE_COLS:
+            if col not in X.columns:
+                X[col] = 0
+        X = X[FEATURE_COLS]
+        prob = float(model.predict_proba(X)[0][1])
+        record_score(uid, prob)
+        scored += 1
+
+    at_risk = [u for u in get_alerts(threshold=body.threshold, limit=len(body.user_ids))
+               if u["user_id"] in body.user_ids]
+
+    return {
+        "scored":      scored,
+        "failed":      failed,
+        "at_risk":     len(at_risk),
+        "threshold":   body.threshold,
+        "users":       at_risk,
+    }
