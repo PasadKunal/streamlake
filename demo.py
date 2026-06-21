@@ -972,23 +972,67 @@ border-left:4px solid {color};border-radius:14px;padding:1rem 1.3rem;">
     st.markdown('<div class="section-hdr"><span>Try the API</span></div>',
                 unsafe_allow_html=True)
 
-    def _api_card(label, cmd):
-        # Streamlit markdown processes content inside HTML tags, so we must
-        # escape markdown-significant chars and convert newlines to <br>
-        safe = (
-            cmd.replace("&", "&amp;")
-               .replace("<", "&lt;")
-               .replace(">", "&gt;")
-               .replace("#", "&#35;")
-               .replace("\n", "<br>")
-        )
+    METHOD_COLOR = {"POST": "#6366f1", "GET": "#10b981"}
+    METHOD_BG    = {"POST": "#eef2ff", "GET": "#ecfdf5"}
+
+    def _safe(s):
         return (
-            f'<div style="background:#1e293b;border-radius:14px;padding:1.2rem 1.4rem;">'
-            f'<div style="font-size:0.65rem;font-weight:700;color:#64748b;text-transform:uppercase;'
-            f'letter-spacing:0.12em;margin-bottom:0.85rem;">{label}</div>'
-            f'<div style="color:#e2e8f0;font-size:0.74rem;line-height:1.85;'
-            f'white-space:pre-wrap;overflow-x:auto;'
-            f'font-family:\'SFMono-Regular\',\'Consolas\',\'Menlo\',monospace;">{safe}</div>'
+            s.replace("&", "&amp;")
+             .replace("<", "&lt;")
+             .replace(">", "&gt;")
+             .replace("#", "&#35;")
+             .replace("\n", "<br>")
+        )
+
+    def _colorize(html):
+        lines = html.split("<br>")
+        out = []
+        for ln in lines:
+            s = ln.lstrip()
+            if s.startswith("&#35;"):
+                out.append(f'<span style="color:#64748b;font-style:italic;">{ln}</span>')
+            elif s.startswith("curl "):
+                out.append(ln.replace(
+                    "curl ", '<span style="color:#7dd3fc;font-weight:600;">curl</span> ', 1))
+            elif s.startswith("-"):
+                sp = ln.find("-")
+                ep = ln.find(" ", sp)
+                ep = ep if ep != -1 else len(ln)
+                flag = ln[sp:ep]
+                out.append(
+                    ln[:sp]
+                    + f'<span style="color:#fbbf24;">{flag}</span>'
+                    + ln[ep:]
+                )
+            elif s.startswith("|"):
+                out.append(ln.replace(
+                    "|", '<span style="color:#94a3b8;">|</span>', 1))
+            else:
+                out.append(ln)
+        return "<br>".join(out)
+
+    def _api_card(method, endpoint, desc, cmd):
+        mc = METHOD_COLOR[method]
+        mb = METHOD_BG[method]
+        code = _colorize(_safe(cmd))
+        return (
+            f'<div style="border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;'
+            f'box-shadow:0 2px 16px rgba(99,102,241,0.07);">'
+            f'<div style="height:3px;background:{mc};"></div>'
+            f'<div style="background:#ffffff;padding:0.9rem 1.2rem 0.85rem;">'
+            f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:0.35rem;">'
+            f'<span style="background:{mb};color:{mc};font-size:0.58rem;font-weight:800;'
+            f'padding:2px 8px;border-radius:4px;letter-spacing:0.09em;">{method}</span>'
+            f'<span style="font-family:\'SFMono-Regular\',monospace;font-size:0.72rem;'
+            f'color:#64748b;">{endpoint}</span>'
+            f'</div>'
+            f'<div style="font-size:0.83rem;font-weight:600;color:#0f172a;">{desc}</div>'
+            f'</div>'
+            f'<div style="background:#0f172a;padding:1rem 1.2rem;">'
+            f'<div style="color:#e2e8f0;font-size:0.72rem;line-height:1.9;'
+            f'white-space:pre-wrap;font-family:\'SFMono-Regular\',\'Consolas\',monospace;">'
+            f'{code}</div>'
+            f'</div>'
             f'</div>'
         )
 
@@ -1025,11 +1069,11 @@ border-left:4px solid {color};border-radius:14px;padding:1rem 1.3rem;">
 # order_date, product_id, country"""
 
     st.markdown(
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">'
-        + _api_card("Score a customer", _predict)
-        + _api_card("Get at-risk customers", _alerts)
-        + _api_card("Push a Shopify order", _webhook)
-        + _api_card("Upload a CSV", _csv)
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">'
+        + _api_card("POST", "/predict",        "Score a customer",        _predict)
+        + _api_card("GET",  "/alerts",          "Get at-risk customers",   _alerts)
+        + _api_card("POST", "/ingest/webhook",  "Push a Shopify order",    _webhook)
+        + _api_card("POST", "/ingest/csv",      "Upload a CSV",            _csv)
         + '</div>',
         unsafe_allow_html=True,
     )
