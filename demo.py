@@ -812,59 +812,66 @@ with tab4:
     st.markdown('<div class="section-hdr"><span>Architecture</span></div>',
                 unsafe_allow_html=True)
 
-    def _layer(color, bg, border, label, path, bullets):
+    def _tl(color, bg, border, label, path, bullets, side):
         items = "".join(
-            f'<li style="margin:0;padding:0;">{b}</li>' for b in bullets
+            f'<li style="margin:3px 0;color:#475569;">{b}</li>' for b in bullets
         )
-        return f"""
-<div style="background:{bg};border:1px solid {border};border-left:4px solid {color};
-border-radius:12px;padding:1rem 1.2rem;">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.5rem;flex-wrap:wrap;">
-    <span style="background:{color};color:#fff;font-size:0.62rem;font-weight:700;
-    padding:2px 9px;border-radius:4px;text-transform:uppercase;letter-spacing:0.1em;
-    white-space:nowrap;">{label}</span>
-    <code style="font-size:0.72rem;color:{color};background:rgba(0,0,0,0.04);
-    padding:1px 6px;border-radius:4px;">{path}</code>
+        card = f"""<div style="background:{bg};border:1px solid {border};
+border-left:4px solid {color};border-radius:14px;padding:1rem 1.3rem;">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.55rem;flex-wrap:wrap;">
+    <span style="background:{color};color:#fff;font-size:0.6rem;font-weight:700;
+    padding:2px 9px;border-radius:4px;text-transform:uppercase;letter-spacing:0.1em;">{label}</span>
+    <code style="font-size:0.71rem;color:{color};background:rgba(0,0,0,0.05);
+    padding:1px 7px;border-radius:4px;">{path}</code>
   </div>
-  <ul style="margin:0;padding-left:1.2rem;font-size:0.81rem;color:#475569;line-height:1.8;">
-    {items}
-  </ul>
+  <ul style="margin:0;padding-left:1.1rem;font-size:0.8rem;line-height:1.85;">{items}</ul>
 </div>"""
+        dot = (f'<div style="display:flex;justify-content:center;padding-top:22px;'
+               f'position:relative;z-index:1;">'
+               f'<div style="width:16px;height:16px;background:{color};border-radius:50%;'
+               f'border:3px solid #fff;box-shadow:0 0 0 3px {border};"></div></div>')
+        left  = card  if side == "left"  else "<div></div>"
+        right = card  if side == "right" else "<div></div>"
+        return (f'<div style="display:grid;grid-template-columns:1fr 44px 1fr;'
+                f'align-items:start;gap:16px;margin-bottom:4px;">'
+                f'{left}{dot}{right}</div>')
 
-    arrow = '<div style="text-align:center;font-size:1.2rem;color:#c7d2fe;padding:2px 0;">&#8595;</div>'
-
-    st.markdown(
-        _layer("#6366f1","#eef2ff","#c7d2fe","Ingest","Kafka / Redpanda + REST + CSV",[
+    timeline = (
+        '<div style="position:relative;padding:4px 0;">'
+        '<div style="position:absolute;left:calc(50% - 1px);top:0;bottom:0;width:2px;'
+        'background:linear-gradient(to bottom,#c7d2fe,#e0e7ff);z-index:0;"></div>'
+        + _tl("#6366f1","#eef2ff","#c7d2fe","Ingest","Kafka / Redpanda + REST + CSV",[
             "Kafka/Redpanda &rarr; Avro + Schema Registry &nbsp; ~1,400 events/s",
             "POST /ingest/webhook?source=shopify|woocommerce",
             "POST /ingest/csv &nbsp; (multipart file upload)",
-        ]) + arrow +
-        _layer("#f59e0b","#fffbeb","#fde68a","Bronze","s3://streamlake-bronze/events/{tenant}/",[
+        ], "left")
+        + _tl("#f59e0b","#fffbeb","#fde68a","Bronze","s3://streamlake-bronze/events/{tenant}/",[
             "Raw, immutable events in Delta Lake (delta-rs &mdash; no Spark or JVM)",
-            "Partitioned by <code>ingestion_date</code> &nbsp;&middot;&nbsp; idempotent consumer",
-            "At-least-once delivery &nbsp;&middot;&nbsp; tenant-namespaced S3 prefix",
-        ]) + arrow +
-        _layer("#8b5cf6","#f5f3ff","#ddd6fe","Silver","s3://streamlake-silver/events/",[
-            "Event-time watermarks &nbsp;&middot;&nbsp; LRU dedup with 1h TTL",
+            "Partitioned by <code>ingestion_date</code> &middot; idempotent consumer",
+            "At-least-once delivery &middot; tenant-namespaced S3 prefix",
+        ], "right")
+        + _tl("#8b5cf6","#f5f3ff","#ddd6fe","Silver","s3://streamlake-silver/events/",[
+            "Event-time watermarks &middot; LRU dedup with 1h TTL",
             "6 Great Expectations validation rules",
             "Bad records routed to quarantine side-output",
-        ]) + arrow +
-        _layer("#10b981","#ecfdf5","#a7f3d0","Gold","s3://streamlake-gold/",[
+        ], "left")
+        + _tl("#10b981","#ecfdf5","#a7f3d0","Gold","s3://streamlake-gold/",[
             "DuckDB aggregations: DAU, revenue, funnel, user_signals",
             "Per-user behavioral signals (purchase frequency, spend windows)",
-        ]) + arrow +
-        _layer("#06b6d4","#ecfeff","#a5f3fc","Features","s3://streamlake-features/ + Redis",[
+        ], "right")
+        + _tl("#06b6d4","#ecfeff","#a5f3fc","Features","s3://streamlake-features/ + Redis",[
             "Feast 0.39 materializes Gold &rarr; Redis online store",
             "9 rolling features per user: purchases &amp; revenue over 1h / 24h / 7d",
             "Retrieved in &lt;10ms at inference time (no S3 call at serve time)",
-        ]) + arrow +
-        _layer("#ef4444","#fef2f2","#fecaca","Serve","https://streamlake.onrender.com",[
-            "POST /predict &rarr; XGBoost &middot; SHAP explanations &middot; 90/10 A/B split",
+        ], "left")
+        + _tl("#ef4444","#fef2f2","#fecaca","Serve","https://streamlake.onrender.com",[
+            "POST /predict &rarr; XGBoost &middot; SHAP &middot; 90/10 A/B split",
             "GET /alerts &rarr; Redis sorted-set range query O(log N)",
             "Prometheus metrics &middot; PSI drift detection &middot; outbound webhooks",
-        ]),
-        unsafe_allow_html=True,
+        ], "right")
+        + '</div>'
     )
+    st.markdown(timeline, unsafe_allow_html=True)
 
     st.markdown('<div class="section-hdr"><span>Key Design Decisions</span></div>',
                 unsafe_allow_html=True)
