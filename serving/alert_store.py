@@ -9,6 +9,9 @@ from __future__ import annotations
 import os
 
 import redis as _redis_lib
+from dotenv import load_dotenv
+
+load_dotenv()
 
 CHURN_SCORES_KEY = "streamlake:churn_scores"
 
