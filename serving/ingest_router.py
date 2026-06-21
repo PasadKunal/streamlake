@@ -18,7 +18,7 @@ import io
 import os
 
 import pandas as pd
-from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel
 
 from ingestion.normalizers import (
@@ -26,6 +26,7 @@ from ingestion.normalizers import (
     normalize_shopify_order,
     normalize_woocommerce_order,
 )
+from serving.auth import get_tenant
 from storage.bronze_schema import BRONZE_SCHEMA
 from storage.delta_writer import write_batch
 
@@ -41,6 +42,7 @@ class WebhookResponse(BaseModel):
     user_id: str
     amount_cents: int
     source: str
+    tenant: str
 
 
 class CsvResponse(BaseModel):
@@ -48,6 +50,7 @@ class CsvResponse(BaseModel):
     rows_ingested: int
     rows_failed: int
     errors: list[dict]
+    tenant: str
     pipeline_note: str
 
 
@@ -55,6 +58,7 @@ class CsvResponse(BaseModel):
 async def webhook_ingest(
     request: Request,
     source: str = Query("shopify", description="Platform sending the webhook: shopify | woocommerce"),
+    tenant: str = Depends(get_tenant),
 ) -> WebhookResponse:
     """
     Accept a single order webhook from Shopify or WooCommerce and write it
@@ -79,8 +83,9 @@ async def webhook_ingest(
     except (KeyError, ValueError) as e:
         raise HTTPException(status_code=422, detail=f"Payload normalization failed: {e}")
 
+    table_path = f"{BRONZE_PATH}/{tenant}"
     try:
-        write_batch([record], BRONZE_PATH, BRONZE_SCHEMA, partition_by=["ingestion_date"])
+        write_batch([record], table_path, BRONZE_SCHEMA, partition_by=["ingestion_date"])
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Bronze write failed: {e}")
 
@@ -90,11 +95,15 @@ async def webhook_ingest(
         user_id=record["user_id"],
         amount_cents=record["amount_cents"],
         source=source,
+        tenant=tenant,
     )
 
 
 @router.post("/csv", response_model=CsvResponse)
-async def csv_ingest(file: UploadFile = File(...)) -> CsvResponse:
+async def csv_ingest(
+    file: UploadFile = File(...),
+    tenant: str = Depends(get_tenant),
+) -> CsvResponse:
     """
     Accept a CSV file of historical orders and write all valid rows to the
     Bronze Delta table in S3.
@@ -132,8 +141,9 @@ async def csv_ingest(file: UploadFile = File(...)) -> CsvResponse:
             detail={"message": "No valid rows found", "errors": errors},
         )
 
+    table_path = f"{BRONZE_PATH}/{tenant}"
     try:
-        written = write_batch(records, BRONZE_PATH, BRONZE_SCHEMA, partition_by=["ingestion_date"])
+        written = write_batch(records, table_path, BRONZE_SCHEMA, partition_by=["ingestion_date"])
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Bronze write failed: {e}")
 
@@ -142,6 +152,7 @@ async def csv_ingest(file: UploadFile = File(...)) -> CsvResponse:
         rows_ingested=written,
         rows_failed=len(errors),
         errors=errors,
+        tenant=tenant,
         pipeline_note=(
             "Records written to Bronze Delta (S3). Run processing.bronze_to_silver, "
             "run_gold_pipeline, and feature_store.feature_pipeline to propagate "

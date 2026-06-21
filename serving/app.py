@@ -28,7 +28,7 @@ from pathlib import Path
 
 import mlflow.xgboost
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from xgboost import XGBClassifier
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel
@@ -39,6 +39,7 @@ from ml.ab_splitter import assign as ab_assign
 from ml.shap_explainer import explain_prediction
 from ml.train import EXPERIMENT, FEATURE_COLS, MODEL_NAME, MLFLOW_URI
 from serving.alert_store import get_alerts, record_score, total_scored
+from serving.auth import configured_tenants, get_tenant
 from serving.ingest_router import router as ingest_router
 from serving.outbound import build_alert_payload, fire_webhook
 from serving.metrics import (
@@ -183,8 +184,14 @@ def get_features(user_id: str):
         raise HTTPException(status_code=503, detail=str(e))
 
 
+@app.get("/tenants")
+def list_tenants():
+    """Return the list of configured tenant IDs (not the keys themselves)."""
+    return {"tenants": configured_tenants()}
+
+
 @app.post("/predict", response_model=PredictResponse)
-def predict(request: PredictRequest):
+def predict(request: PredictRequest, tenant: str = Depends(get_tenant)):
     if not _models:
         raise HTTPException(status_code=503, detail="Models not loaded. Run python -m ml.train first.")
 
@@ -221,8 +228,8 @@ def predict(request: PredictRequest):
     top_features = explain_prediction(model, X)
     latency = time.perf_counter() - t0
 
-    # Track score in Redis sorted set (powers GET /alerts)
-    record_score(request.user_id, prob)
+    # Track score in Redis sorted set (powers GET /alerts), namespaced by tenant
+    record_score(request.user_id, prob, tenant=tenant)
 
     # Outbound webhook — fire-and-forget, never blocks the response
     if request.alert_webhook_url and prob >= request.alert_threshold:
@@ -266,25 +273,25 @@ class RefreshRequest(BaseModel):
 
 
 @app.get("/alerts")
-def alerts(threshold: float = 0.7, limit: int = 100):
+def alerts(threshold: float = 0.7, limit: int = 100, tenant: str = Depends(get_tenant)):
     """
     Return users whose churn probability >= threshold.
     Scores are written to Redis on every /predict call, so this is always O(log N).
     """
     try:
-        results = get_alerts(threshold=threshold, limit=limit)
+        results = get_alerts(threshold=threshold, limit=limit, tenant=tenant)
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
     return {
         "threshold":     threshold,
         "total_at_risk": len(results),
-        "total_scored":  total_scored(),
+        "total_scored":  total_scored(tenant=tenant),
         "users":         results,
     }
 
 
 @app.post("/alerts/refresh")
-def refresh_alerts(body: RefreshRequest):
+def refresh_alerts(body: RefreshRequest, tenant: str = Depends(get_tenant)):
     """
     Batch-score a list of user_ids and populate the churn_scores sorted set.
     Useful for proactively checking a cohort rather than waiting for /predict calls.
@@ -314,10 +321,10 @@ def refresh_alerts(body: RefreshRequest):
                 X[col] = 0
         X = X[FEATURE_COLS]
         prob = float(model.predict_proba(X)[0][1])
-        record_score(uid, prob)
+        record_score(uid, prob, tenant=tenant)
         scored += 1
 
-    at_risk = [u for u in get_alerts(threshold=body.threshold, limit=len(body.user_ids))
+    at_risk = [u for u in get_alerts(threshold=body.threshold, limit=len(body.user_ids), tenant=tenant)
                if u["user_id"] in body.user_ids]
 
     return {

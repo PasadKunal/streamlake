@@ -25,6 +25,8 @@ def _secret(key: str, default: str = "") -> str:
         return os.getenv(key, default)
 
 API_URL = _secret("API_URL", "http://localhost:8000")
+API_KEY = _secret("STREAMLAKE_API_KEY", "sk-demo-streamlake")
+_API_HEADERS = {"X-Api-Key": API_KEY}
 
 _endpoint = _secret("AWS_ENDPOINT_URL", os.getenv("AWS_ENDPOINT_URL", ""))
 STORAGE_OPTIONS: dict = {
@@ -520,7 +522,8 @@ SHAP shows which features drove the score.
         with st.spinner("Fetching features and running model (first request may take ~30s to wake API)..."):
             try:
                 resp = requests.post(
-                    f"{API_URL}/predict", json={"user_id": user_id}, timeout=60
+                    f"{API_URL}/predict", json={"user_id": user_id},
+                    headers=_API_HEADERS, timeout=60
                 )
             except requests.exceptions.ConnectionError:
                 st.error(f"Cannot connect to API at {API_URL}. Check that RENDER is running.")

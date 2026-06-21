@@ -1,7 +1,7 @@
 """
-Redis sorted-set store for churn scores.
+Redis sorted-set store for churn scores, namespaced by tenant.
 
-Every /predict call writes to streamlake:churn_scores (key=user_id, score=prob).
+Every /predict call writes to streamlake:churn_scores:{tenant_id}.
 GET /alerts queries this set by score range — always O(log N), no full scan.
 """
 from __future__ import annotations
@@ -12,8 +12,6 @@ import redis as _redis_lib
 from dotenv import load_dotenv
 
 load_dotenv()
-
-CHURN_SCORES_KEY = "streamlake:churn_scores"
 
 _client: _redis_lib.Redis | None = None
 
@@ -34,18 +32,22 @@ def _redis() -> _redis_lib.Redis:
     return _client
 
 
-def record_score(user_id: str, score: float) -> None:
-    """Write churn probability to the sorted set. Non-critical — never raises."""
+def _scores_key(tenant: str) -> str:
+    return f"streamlake:churn_scores:{tenant}"
+
+
+def record_score(user_id: str, score: float, tenant: str = "default") -> None:
+    """Write churn probability to the tenant sorted set. Non-critical — never raises."""
     try:
-        _redis().zadd(CHURN_SCORES_KEY, {user_id: score})
+        _redis().zadd(_scores_key(tenant), {user_id: score})
     except Exception:
         pass
 
 
-def get_alerts(threshold: float = 0.7, limit: int = 100) -> list[dict]:
-    """Return up to `limit` users with score >= threshold, sorted desc."""
+def get_alerts(threshold: float = 0.7, limit: int = 100, tenant: str = "default") -> list[dict]:
+    """Return up to `limit` users with score >= threshold for this tenant, sorted desc."""
     results = _redis().zrangebyscore(
-        CHURN_SCORES_KEY, threshold, "+inf", withscores=True
+        _scores_key(tenant), threshold, "+inf", withscores=True
     )
     return [
         {"user_id": uid, "churn_probability": round(float(score), 4)}
@@ -53,8 +55,8 @@ def get_alerts(threshold: float = 0.7, limit: int = 100) -> list[dict]:
     ]
 
 
-def total_scored() -> int:
+def total_scored(tenant: str = "default") -> int:
     try:
-        return _redis().zcard(CHURN_SCORES_KEY)
+        return _redis().zcard(_scores_key(tenant))
     except Exception:
         return 0
