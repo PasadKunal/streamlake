@@ -869,105 +869,98 @@ border-radius:12px;padding:1rem 1.2rem;">
     st.markdown('<div class="section-hdr"><span>Key Design Decisions</span></div>',
                 unsafe_allow_html=True)
 
-    d1, d2, d3 = st.columns(3)
+    st.markdown("""
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
 
-    with d1:
-        st.markdown("""
-<div class="how-card">
-  <div style="width:38px;height:38px;background:#fffbeb;border:1.5px solid #fde68a;
-  border-radius:10px;display:flex;align-items:center;justify-content:center;
-  font-size:0.75rem;font-weight:800;color:#f59e0b;margin-bottom:0.9rem;
-  letter-spacing:0.02em;">S3</div>
-  <div class="how-title" style="color:#f59e0b;">Delta Lake on S3</div>
-  <div class="how-body">
-    Chose <strong>delta-rs</strong> (Rust) over PySpark so the entire pipeline
-    runs on a single machine with no JVM overhead. ACID transactions and
-    time-travel come for free. Partitioning by <code>ingestion_date</code> ensures
-    each query scans only the relevant day's files.
+  <div style="background:#fff;border-radius:16px;padding:1.5rem;
+  border:1px solid #f1f5f9;box-shadow:0 2px 8px rgba(99,102,241,0.07);">
+    <div style="width:38px;height:38px;background:#fffbeb;border:1.5px solid #fde68a;
+    border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-size:0.72rem;font-weight:800;color:#f59e0b;margin-bottom:1rem;">S3</div>
+    <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
+    letter-spacing:0.1em;color:#f59e0b;margin-bottom:0.6rem;">Delta Lake on S3</div>
+    <div style="font-size:0.82rem;color:#475569;line-height:1.75;">
+      Chose <strong>delta-rs</strong> (Rust) over PySpark so the pipeline runs on
+      a single machine with no JVM. ACID transactions and time-travel come free.
+      Partitioned by <code style="background:#f8faff;padding:1px 5px;border-radius:4px;
+      font-size:0.78rem;">ingestion_date</code> so each query scans only that day.
+    </div>
   </div>
-</div>""", unsafe_allow_html=True)
 
-    with d2:
-        st.markdown("""
-<div class="how-card">
-  <div style="width:38px;height:38px;background:#ecfeff;border:1.5px solid #a5f3fc;
-  border-radius:10px;display:flex;align-items:center;justify-content:center;
-  font-size:0.75rem;font-weight:800;color:#06b6d4;margin-bottom:0.9rem;
-  letter-spacing:0.02em;">RD</div>
-  <div class="how-title" style="color:#06b6d4;">Feast + Redis Feature Store</div>
-  <div class="how-body">
-    Features are pre-computed in batch (Gold pipeline) and pushed to
-    <strong>Redis</strong> via Feast. The online store gives sub-10ms retrieval
-    at inference time without touching S3. The offline Delta store keeps
-    full history for retraining.
+  <div style="background:#fff;border-radius:16px;padding:1.5rem;
+  border:1px solid #f1f5f9;box-shadow:0 2px 8px rgba(99,102,241,0.07);">
+    <div style="width:38px;height:38px;background:#ecfeff;border:1.5px solid #a5f3fc;
+    border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-size:0.72rem;font-weight:800;color:#06b6d4;margin-bottom:1rem;">RD</div>
+    <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
+    letter-spacing:0.1em;color:#06b6d4;margin-bottom:0.6rem;">Feast + Redis Feature Store</div>
+    <div style="font-size:0.82rem;color:#475569;line-height:1.75;">
+      Features are pre-computed in batch and pushed to <strong>Redis</strong> via Feast.
+      The online store gives sub-10ms retrieval at inference time without touching S3.
+      The offline Delta store keeps full history for retraining.
+    </div>
   </div>
-</div>""", unsafe_allow_html=True)
 
-    with d3:
-        st.markdown("""
-<div class="how-card">
-  <div style="width:38px;height:38px;background:#ecfdf5;border:1.5px solid #a7f3d0;
-  border-radius:10px;display:flex;align-items:center;justify-content:center;
-  font-size:0.75rem;font-weight:800;color:#10b981;margin-bottom:0.9rem;
-  letter-spacing:0.02em;">ML</div>
-  <div class="how-title" style="color:#10b981;">SHAP + PSI Observability</div>
-  <div class="how-body">
-    Every prediction returns <strong>SHAP values</strong> so the score is
-    never a black box. Population Stability Index (PSI) is computed at startup
-    and pushed to Prometheus. PSI above 0.25 on any feature triggers a drift
-    alert without a separate ML platform.
+  <div style="background:#fff;border-radius:16px;padding:1.5rem;
+  border:1px solid #f1f5f9;box-shadow:0 2px 8px rgba(99,102,241,0.07);">
+    <div style="width:38px;height:38px;background:#ecfdf5;border:1.5px solid #a7f3d0;
+    border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-size:0.72rem;font-weight:800;color:#10b981;margin-bottom:1rem;">ML</div>
+    <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
+    letter-spacing:0.1em;color:#10b981;margin-bottom:0.6rem;">SHAP + PSI Observability</div>
+    <div style="font-size:0.82rem;color:#475569;line-height:1.75;">
+      Every prediction returns <strong>SHAP values</strong> so the score is never a black box.
+      PSI is computed at startup and pushed to Prometheus. PSI above 0.25 on any feature
+      triggers a drift alert without a separate ML platform.
+    </div>
   </div>
-</div>""", unsafe_allow_html=True)
 
-    d4, d5, d6 = st.columns(3)
-
-    with d4:
-        st.markdown("""
-<div class="how-card">
-  <div style="width:38px;height:38px;background:#eef2ff;border:1.5px solid #c7d2fe;
-  border-radius:10px;display:flex;align-items:center;justify-content:center;
-  font-size:0.75rem;font-weight:800;color:#6366f1;margin-bottom:0.9rem;
-  letter-spacing:0.02em;">KY</div>
-  <div class="how-title" style="color:#6366f1;">Multi-Tenant API Keys</div>
-  <div class="how-body">
-    Each tenant authenticates with an <code>X-Api-Key</code> header. Ingested
-    data lands under <code>{BRONZE_PATH}/{tenant_id}/</code> in S3 and churn
-    scores are isolated in Redis under
-    <code>streamlake:churn_scores:{tenant_id}</code>.
+  <div style="background:#fff;border-radius:16px;padding:1.5rem;
+  border:1px solid #f1f5f9;box-shadow:0 2px 8px rgba(99,102,241,0.07);">
+    <div style="width:38px;height:38px;background:#eef2ff;border:1.5px solid #c7d2fe;
+    border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-size:0.72rem;font-weight:800;color:#6366f1;margin-bottom:1rem;">KY</div>
+    <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
+    letter-spacing:0.1em;color:#6366f1;margin-bottom:0.6rem;">Multi-Tenant API Keys</div>
+    <div style="font-size:0.82rem;color:#475569;line-height:1.75;">
+      Each tenant authenticates with an
+      <code style="background:#eef2ff;padding:1px 5px;border-radius:4px;font-size:0.78rem;color:#6366f1;">X-Api-Key</code>
+      header. Data lands under <code style="background:#f8faff;padding:1px 5px;border-radius:4px;font-size:0.78rem;">{BRONZE_PATH}/{tenant_id}/</code>
+      in S3 and churn scores are isolated in Redis per tenant.
+    </div>
   </div>
-</div>""", unsafe_allow_html=True)
 
-    with d5:
-        st.markdown("""
-<div class="how-card">
-  <div style="width:38px;height:38px;background:#f5f3ff;border:1.5px solid #ddd6fe;
-  border-radius:10px;display:flex;align-items:center;justify-content:center;
-  font-size:0.75rem;font-weight:800;color:#8b5cf6;margin-bottom:0.9rem;
-  letter-spacing:0.02em;">A/B</div>
-  <div class="how-title" style="color:#8b5cf6;">90 / 10 A/B Split</div>
-  <div class="how-body">
-    Each <code>/predict</code> call hashes the <code>user_id</code> to assign
-    champion (90%) or challenger (10%) model deterministically. The same user
-    always gets the same model, making cohort analysis clean without a separate
-    experiment platform.
+  <div style="background:#fff;border-radius:16px;padding:1.5rem;
+  border:1px solid #f1f5f9;box-shadow:0 2px 8px rgba(99,102,241,0.07);">
+    <div style="width:38px;height:38px;background:#f5f3ff;border:1.5px solid #ddd6fe;
+    border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-size:0.72rem;font-weight:800;color:#8b5cf6;margin-bottom:1rem;">A/B</div>
+    <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
+    letter-spacing:0.1em;color:#8b5cf6;margin-bottom:0.6rem;">90 / 10 A/B Split</div>
+    <div style="font-size:0.82rem;color:#475569;line-height:1.75;">
+      Each <code style="background:#f5f3ff;padding:1px 5px;border-radius:4px;font-size:0.78rem;color:#8b5cf6;">/predict</code>
+      call hashes the user_id to deterministically assign champion (90%) or challenger (10%).
+      The same user always gets the same model, keeping cohort analysis clean.
+    </div>
   </div>
-</div>""", unsafe_allow_html=True)
 
-    with d6:
-        st.markdown("""
-<div class="how-card">
-  <div style="width:38px;height:38px;background:#fef2f2;border:1.5px solid #fecaca;
-  border-radius:10px;display:flex;align-items:center;justify-content:center;
-  font-size:0.75rem;font-weight:800;color:#ef4444;margin-bottom:0.9rem;
-  letter-spacing:0.02em;">WH</div>
-  <div class="how-title" style="color:#ef4444;">Fire-and-Forget Webhooks</div>
-  <div class="how-body">
-    When churn probability exceeds the alert threshold, <code>/predict</code>
-    fires an outbound webhook to the caller's URL in a daemon thread. The
-    response is never delayed waiting for delivery, and failures are logged
-    but never propagated to the caller.
+  <div style="background:#fff;border-radius:16px;padding:1.5rem;
+  border:1px solid #f1f5f9;box-shadow:0 2px 8px rgba(99,102,241,0.07);">
+    <div style="width:38px;height:38px;background:#fef2f2;border:1.5px solid #fecaca;
+    border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-size:0.72rem;font-weight:800;color:#ef4444;margin-bottom:1rem;">WH</div>
+    <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
+    letter-spacing:0.1em;color:#ef4444;margin-bottom:0.6rem;">Fire-and-Forget Webhooks</div>
+    <div style="font-size:0.82rem;color:#475569;line-height:1.75;">
+      When churn probability exceeds the alert threshold,
+      <code style="background:#fef2f2;padding:1px 5px;border-radius:4px;font-size:0.78rem;color:#ef4444;">/predict</code>
+      fires an outbound webhook in a daemon thread. The response is never delayed,
+      and failures are logged but never propagated to the caller.
+    </div>
   </div>
-</div>""", unsafe_allow_html=True)
+
+</div>
+""", unsafe_allow_html=True)
 
     st.markdown('<div class="section-hdr"><span>Try the API</span></div>',
                 unsafe_allow_html=True)
