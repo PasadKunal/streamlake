@@ -334,7 +334,7 @@ st.markdown("""
 
 # -- tabs ---------------------------------------------------------------------
 
-tab1, tab2, tab3 = st.tabs(["Pipeline", "Predict", "Drift Monitor"])
+tab1, tab2, tab3, tab4 = st.tabs(["Pipeline", "Predict", "Drift Monitor", "How it works"])
 
 
 # =============================================================================
@@ -744,3 +744,201 @@ since training. PSI below 0.10 is stable. Above 0.25 means the model should be r
         st.warning(f"Training baseline not found: {e}\n\nRun `python -m ml.train` to generate it.")
     except Exception as e:
         st.error(f"Error: {e}")
+
+
+# =============================================================================
+# TAB 4 - HOW IT WORKS
+# =============================================================================
+with tab4:
+
+    # ── Architecture diagram ──────────────────────────────────────────────────
+    st.markdown('<div class="section-hdr"><span>Architecture</span></div>',
+                unsafe_allow_html=True)
+
+    st.markdown("""
+<div style="background:linear-gradient(160deg,#10162a,#141d30);border:1px solid rgba(139,92,246,0.15);
+border-radius:14px;padding:1.6rem 1.8rem;font-family:monospace;font-size:0.78rem;
+color:#64748b;line-height:1.9;overflow-x:auto;">
+
+<span style="color:#8b5cf6;font-weight:700;">INGEST</span>
+&nbsp;&nbsp;&nbsp;Kafka / Redpanda&nbsp;&nbsp;→&nbsp;&nbsp;Avro + Schema Registry&nbsp;&nbsp;~1,400 events/s
+&nbsp;&nbsp;&nbsp;REST webhook&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→&nbsp;&nbsp;POST /ingest/webhook?source=shopify|woocommerce
+&nbsp;&nbsp;&nbsp;CSV upload&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→&nbsp;&nbsp;POST /ingest/csv
+
+<span style="color:#fb923c;font-weight:700;">BRONZE</span> &nbsp; s3://streamlake-bronze/events/{tenant}/
+&nbsp;&nbsp;&nbsp;Raw, immutable events in Delta Lake (delta-rs, no Spark)
+&nbsp;&nbsp;&nbsp;Partitioned by ingestion_date · idempotent consumer
+
+<span style="color:#a78bfa;font-weight:700;">SILVER</span> &nbsp; s3://streamlake-silver/events/
+&nbsp;&nbsp;&nbsp;Event-time watermarks · LRU dedup (1h TTL)
+&nbsp;&nbsp;&nbsp;6 Great Expectations rules · quarantine side-output
+
+<span style="color:#fbbf24;font-weight:700;">GOLD &nbsp;&nbsp;</span> s3://streamlake-gold/
+&nbsp;&nbsp;&nbsp;DuckDB aggregations: DAU, revenue, funnel, user_signals
+
+<span style="color:#38bdf8;font-weight:700;">FEATURES</span> s3://streamlake-features/ + Redis (Feast online store)
+&nbsp;&nbsp;&nbsp;9 rolling features per user: purchases &amp; revenue over 1h / 24h / 7d
+&nbsp;&nbsp;&nbsp;Retrieved in &lt;10ms at inference time
+
+<span style="color:#00d4aa;font-weight:700;">SERVE</span>
+&nbsp;&nbsp;&nbsp;POST /predict&nbsp;&nbsp;→&nbsp;&nbsp;XGBoost · SHAP · 90/10 A/B split · Prometheus
+&nbsp;&nbsp;&nbsp;GET  /alerts&nbsp;&nbsp;&nbsp;→&nbsp;&nbsp;Redis sorted-set range query (O log N)
+&nbsp;&nbsp;&nbsp;GET  /metrics&nbsp;&nbsp;→&nbsp;&nbsp;Prometheus scrape · PSI drift detection
+
+</div>
+""", unsafe_allow_html=True)
+
+    # ── Design decisions ──────────────────────────────────────────────────────
+    st.markdown('<div class="section-hdr"><span>Key Design Decisions</span></div>',
+                unsafe_allow_html=True)
+
+    d1, d2, d3 = st.columns(3)
+
+    with d1:
+        st.markdown("""
+<div class="card">
+  <div style="color:#8b5cf6;font-size:0.7rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.1em;margin-bottom:0.7rem;">Delta Lake on S3</div>
+  <div style="font-size:0.8rem;color:#94a3b8;line-height:1.7;">
+    Chose <strong style="color:#e2e8f0;">delta-rs</strong> (Rust) over PySpark so the
+    pipeline runs on a single machine with no JVM. ACID transactions and time-travel
+    come for free. Partitioning by <code style="color:#a78bfa;">ingestion_date</code>
+    keeps each query scanning only the relevant day's files.
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+    with d2:
+        st.markdown("""
+<div class="card">
+  <div style="color:#06b6d4;font-size:0.7rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.1em;margin-bottom:0.7rem;">Feast + Redis Feature Store</div>
+  <div style="font-size:0.8rem;color:#94a3b8;line-height:1.7;">
+    Features are pre-computed in batch (Gold pipeline) and pushed to
+    <strong style="color:#e2e8f0;">Redis</strong> via Feast. The online store gives
+    sub-10ms feature retrieval at inference time without hitting S3.
+    The offline store (Delta) keeps a full history for retraining.
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+    with d3:
+        st.markdown("""
+<div class="card">
+  <div style="color:#00d4aa;font-size:0.7rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.1em;margin-bottom:0.7rem;">SHAP + PSI Observability</div>
+  <div style="font-size:0.8rem;color:#94a3b8;line-height:1.7;">
+    Every prediction returns <strong style="color:#e2e8f0;">SHAP values</strong> so
+    the score is never a black box. Population Stability Index (PSI) is computed at
+    startup and pushed to Prometheus. PSI above 0.25 on any feature triggers a
+    drift alert without needing a separate ML platform.
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+    d4, d5, d6 = st.columns(3)
+
+    with d4:
+        st.markdown("""
+<div class="card">
+  <div style="color:#fb923c;font-size:0.7rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.1em;margin-bottom:0.7rem;">Multi-tenant API Keys</div>
+  <div style="font-size:0.8rem;color:#94a3b8;line-height:1.7;">
+    Each tenant authenticates with an <code style="color:#a78bfa;">X-Api-Key</code>
+    header. Ingested data lands under
+    <code style="color:#a78bfa;">{BRONZE_PATH}/{tenant_id}/</code> in S3 and churn
+    scores are isolated in Redis under
+    <code style="color:#a78bfa;">streamlake:churn_scores:{tenant_id}</code>.
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+    with d5:
+        st.markdown("""
+<div class="card">
+  <div style="color:#a78bfa;font-size:0.7rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.1em;margin-bottom:0.7rem;">90 / 10 A/B Split</div>
+  <div style="font-size:0.8rem;color:#94a3b8;line-height:1.7;">
+    Each <code style="color:#a78bfa;">/predict</code> call hashes the
+    <code style="color:#a78bfa;">user_id</code> to assign champion (90%) or
+    challenger (10%) model deterministically. The same user always gets the same
+    model, making cohort analysis clean without a separate experiment platform.
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+    with d6:
+        st.markdown("""
+<div class="card">
+  <div style="color:#38bdf8;font-size:0.7rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.1em;margin-bottom:0.7rem;">Fire-and-forget Webhooks</div>
+  <div style="font-size:0.8rem;color:#94a3b8;line-height:1.7;">
+    When churn probability exceeds the alert threshold,
+    <code style="color:#a78bfa;">/predict</code> fires an outbound webhook to the
+    caller's URL in a daemon thread. The response is never delayed waiting for
+    delivery, and failures are logged but never propagated.
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+    # ── Try the API ───────────────────────────────────────────────────────────
+    st.markdown('<div class="section-hdr"><span>Try the API</span></div>',
+                unsafe_allow_html=True)
+
+    api_col1, api_col2 = st.columns(2)
+
+    with api_col1:
+        st.markdown("**Score a user**")
+        st.code(f"""curl -s -X POST {API_URL}/predict \\
+  -H "Content-Type: application/json" \\
+  -H "X-Api-Key: sk-demo-streamlake" \\
+  -d '{{"user_id": "USER-006775"}}' \\
+  | python3 -m json.tool""", language="bash")
+
+        st.markdown("**Push a Shopify webhook**")
+        st.code(f"""curl -s -X POST \\
+  "{API_URL}/ingest/webhook?source=shopify" \\
+  -H "Content-Type: application/json" \\
+  -H "X-Api-Key: sk-demo-streamlake" \\
+  -d '{{
+    "id": 12345,
+    "created_at": "2024-06-21T10:00:00Z",
+    "customer": {{"id": 99}},
+    "total_price": "149.99",
+    "line_items": [{{"product_id": 7}}],
+    "billing_address": {{"country_code": "US"}}
+  }}'""", language="bash")
+
+    with api_col2:
+        st.markdown("**Get at-risk users**")
+        st.code(f"""curl -s \\
+  "{API_URL}/alerts?threshold=0.7&limit=10" \\
+  -H "X-Api-Key: sk-demo-streamlake" \\
+  | python3 -m json.tool""", language="bash")
+
+        st.markdown("**Upload a CSV**")
+        st.code(f"""curl -s -X POST {API_URL}/ingest/csv \\
+  -H "X-Api-Key: sk-demo-streamlake" \\
+  -F "file=@orders.csv"
+
+# orders.csv columns:
+# order_id, customer_id, total_amount,
+# order_date, product_id, country""", language="bash")
+
+    # ── Data volumes ──────────────────────────────────────────────────────────
+    st.markdown('<div class="section-hdr"><span>Data Volumes (full pipeline run)</span></div>',
+                unsafe_allow_html=True)
+
+    v1, v2, v3, v4 = st.columns(4)
+    for col, label, val, sub, cls in [
+        (v1, "Bronze events",    "96,482",  "raw records",         "sub-orange"),
+        (v2, "Silver events",    "96,477",  "5 quarantined",       "sub-green"),
+        (v3, "Gold user signals","93,357",  "after dedup",         "sub-blue"),
+        (v4, "Feature store",    "93,357",  "users in Redis",      "sub-purple"),
+    ]:
+        col.markdown(f"""
+<div class="card" style="text-align:center;">
+  <div class="card-label">{label}</div>
+  <div class="card-val">{val}</div>
+  <div class="card-sub {cls}">{sub}</div>
+</div>""", unsafe_allow_html=True)
