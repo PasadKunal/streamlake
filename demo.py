@@ -973,14 +973,22 @@ border-left:4px solid {color};border-radius:14px;padding:1rem 1.3rem;">
                 unsafe_allow_html=True)
 
     def _api_card(label, cmd):
-        safe = cmd.replace("&", "&amp;")
+        # Streamlit markdown processes content inside HTML tags, so we must
+        # escape markdown-significant chars and convert newlines to <br>
+        safe = (
+            cmd.replace("&", "&amp;")
+               .replace("<", "&lt;")
+               .replace(">", "&gt;")
+               .replace("#", "&#35;")
+               .replace("\n", "<br>")
+        )
         return (
             f'<div style="background:#1e293b;border-radius:14px;padding:1.2rem 1.4rem;">'
             f'<div style="font-size:0.65rem;font-weight:700;color:#64748b;text-transform:uppercase;'
             f'letter-spacing:0.12em;margin-bottom:0.85rem;">{label}</div>'
-            f'<pre style="margin:0;color:#e2e8f0;font-size:0.74rem;line-height:1.85;'
-            f'white-space:pre;overflow-x:auto;'
-            f'font-family:\'SFMono-Regular\',\'Consolas\',\'Menlo\',monospace;">{safe}</pre>'
+            f'<div style="color:#e2e8f0;font-size:0.74rem;line-height:1.85;'
+            f'white-space:pre-wrap;overflow-x:auto;'
+            f'font-family:\'SFMono-Regular\',\'Consolas\',\'Menlo\',monospace;">{safe}</div>'
             f'</div>'
         )
 
