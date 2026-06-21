@@ -695,12 +695,30 @@ padding:1rem 1.3rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12p
 # =============================================================================
 with tab3:
 
+    # PSI explanation banner
     st.markdown("""
-<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;
-padding:1rem 1.3rem;margin-bottom:1.5rem;font-size:0.84rem;color:#166534;line-height:1.6;">
-  <strong>Population Stability Index (PSI)</strong> measures how much each feature's
-  distribution has shifted since training. PSI below 0.10 is stable. Above 0.25
-  means the model should be retrained.
+<div style="background:linear-gradient(135deg,#eef2ff 0%,#f0fdf4 100%);
+border:1px solid #c7d2fe;border-radius:16px;padding:1.2rem 1.5rem;
+display:flex;gap:14px;align-items:flex-start;margin-bottom:1.5rem;">
+  <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:10px;
+  padding:0.5rem 0.65rem;flex-shrink:0;">
+    <div style="font-size:0.58rem;font-weight:900;color:#fff;letter-spacing:0.08em;">PSI</div>
+  </div>
+  <div style="flex:1;">
+    <div style="font-weight:700;color:#0f172a;font-size:0.9rem;margin-bottom:0.3rem;">
+      Population Stability Index</div>
+    <div style="font-size:0.81rem;color:#475569;line-height:1.65;">
+      Measures how much each feature's distribution has shifted since training.
+    </div>
+    <div style="display:flex;gap:8px;margin-top:0.6rem;flex-wrap:wrap;">
+      <span style="background:#ecfdf5;color:#10b981;font-size:0.68rem;font-weight:700;
+      padding:3px 10px;border-radius:20px;">below 0.10 &mdash; Stable</span>
+      <span style="background:#fffbeb;color:#f59e0b;font-size:0.68rem;font-weight:700;
+      padding:3px 10px;border-radius:20px;">0.10 &ndash; 0.25 &mdash; Monitor</span>
+      <span style="background:#fef2f2;color:#ef4444;font-size:0.68rem;font-weight:700;
+      padding:3px 10px;border-radius:20px;">above 0.25 &mdash; Retrain</span>
+    </div>
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -708,23 +726,54 @@ padding:1rem 1.3rem;margin-bottom:1.5rem;font-size:0.84rem;color:#166534;line-he
         from serving.drift_monitor import compute_drift_report
         report = compute_drift_report()
 
+        # Status banner
         if report["drift_alert"]:
-            st.error("Drift alert: one or more features have shifted significantly. Retraining recommended.")
+            st.markdown("""
+<div style="background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #ef4444;
+border-radius:12px;padding:1rem 1.2rem;display:flex;align-items:center;gap:12px;
+margin-bottom:1rem;">
+  <div style="background:#ef4444;border-radius:6px;padding:3px 9px;font-size:0.58rem;
+  font-weight:800;color:#fff;letter-spacing:0.08em;flex-shrink:0;">DRIFT ALERT</div>
+  <div style="font-size:0.83rem;color:#991b1b;font-weight:500;">
+    One or more features have shifted significantly. Retraining recommended.
+  </div>
+</div>""", unsafe_allow_html=True)
         else:
-            st.success("All features stable. PSI within safe thresholds.")
+            st.markdown("""
+<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-left:4px solid #10b981;
+border-radius:12px;padding:1rem 1.2rem;display:flex;align-items:center;gap:12px;
+margin-bottom:1rem;">
+  <div style="background:#10b981;border-radius:6px;padding:3px 9px;font-size:0.58rem;
+  font-weight:800;color:#fff;letter-spacing:0.08em;flex-shrink:0;">STABLE</div>
+  <div style="font-size:0.83rem;color:#166534;font-weight:500;">
+    All features stable. PSI within safe thresholds.
+  </div>
+</div>""", unsafe_allow_html=True)
 
+        # Stat mini-cards
         st.markdown(f"""
-<div style="display:flex;gap:2rem;font-size:0.8rem;color:#64748b;margin:0.8rem 0 1.2rem;
-flex-wrap:wrap;">
-  <span>Baseline:
-    <strong style="color:#6366f1">{report['baseline_computed_at'][:10]}</strong>
-  </span>
-  <span>Training samples:
-    <strong style="color:#6366f1">{report['baseline_n_samples']:,}</strong>
-  </span>
-  <span>Current samples:
-    <strong style="color:#6366f1">{report['current_n_samples']:,}</strong>
-  </span>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:1.4rem;">
+  <div style="background:#fff;border:1px solid #e0e7ff;border-left:4px solid #6366f1;
+  border-radius:12px;padding:0.85rem 1rem;">
+    <div style="font-size:0.62rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.12em;
+    font-weight:600;margin-bottom:0.3rem;">Baseline date</div>
+    <div style="font-size:1rem;font-weight:700;color:#6366f1;">
+      {report['baseline_computed_at'][:10]}</div>
+  </div>
+  <div style="background:#fff;border:1px solid #e0e7ff;border-left:4px solid #8b5cf6;
+  border-radius:12px;padding:0.85rem 1rem;">
+    <div style="font-size:0.62rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.12em;
+    font-weight:600;margin-bottom:0.3rem;">Training samples</div>
+    <div style="font-size:1rem;font-weight:700;color:#8b5cf6;">
+      {report['baseline_n_samples']:,}</div>
+  </div>
+  <div style="background:#fff;border:1px solid #e0e7ff;border-left:4px solid #06b6d4;
+  border-radius:12px;padding:0.85rem 1rem;">
+    <div style="font-size:0.62rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.12em;
+    font-weight:600;margin-bottom:0.3rem;">Current samples</div>
+    <div style="font-size:1rem;font-weight:700;color:#06b6d4;">
+      {report['current_n_samples']:,}</div>
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -799,9 +848,59 @@ flex-wrap:wrap;">
         st.markdown("\n".join(rows_md), unsafe_allow_html=True)
 
     except FileNotFoundError as e:
-        st.warning(f"Training baseline not found: {e}\n\nRun `python -m ml.train` to generate it.")
+        err_safe = str(e).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        st.markdown(f"""
+<div style="background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #f59e0b;
+border-radius:16px;padding:1.5rem 1.8rem;margin-bottom:1.5rem;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.9rem;">
+    <div style="background:#f59e0b;border-radius:6px;padding:3px 9px;font-size:0.58rem;
+    font-weight:800;color:#fff;letter-spacing:0.08em;">SETUP NEEDED</div>
+    <div style="font-weight:700;color:#92400e;font-size:0.9rem;">Baseline not generated yet</div>
+  </div>
+  <div style="font-size:0.8rem;color:#78350f;line-height:1.7;margin-bottom:1.1rem;">
+    {err_safe}
+  </div>
+  <div style="font-size:0.78rem;color:#92400e;font-weight:600;margin-bottom:0.6rem;">
+    Run these commands once to generate the PSI baseline:
+  </div>
+  <div style="background:#1e293b;border-radius:10px;padding:0.85rem 1.1rem;">
+    <div style="color:#94a3b8;font-size:0.6rem;font-weight:700;letter-spacing:0.1em;
+    margin-bottom:0.5rem;text-transform:uppercase;">bash</div>
+    <div style="color:#7dd3fc;font-size:0.75rem;line-height:1.85;
+    font-family:'SFMono-Regular','Consolas',monospace;">
+      python -m feature_store.feature_pipeline<br>python -m ml.train
+    </div>
+  </div>
+</div>
+<div style="margin-top:0.5rem;">
+  <div style="font-size:0.65rem;font-weight:700;color:#94a3b8;text-transform:uppercase;
+  letter-spacing:0.12em;margin-bottom:0.9rem;">9 features tracked by streamlake</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+    {''.join(
+        f'<div style="background:#fff;border:1px solid #e0e7ff;border-radius:10px;'
+        f'padding:0.7rem 0.9rem;opacity:0.6;">'
+        f'<div style="font-family:monospace;font-size:0.72rem;color:#6366f1;font-weight:600;">{feat}</div>'
+        f'<div style="font-size:0.68rem;color:#94a3b8;margin-top:0.2rem;">PSI: pending</div>'
+        f'</div>'
+        for feat in [
+            "purchase_count_1h","revenue_1h","purchase_count_24h",
+            "revenue_24h","purchase_count_7d","revenue_7d",
+            "days_since_first_purchase","days_since_last_purchase","is_repeat_customer",
+        ]
+    )}
+  </div>
+</div>
+""", unsafe_allow_html=True)
     except Exception as e:
-        st.error(f"Error: {e}")
+        err_safe = str(e).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        st.markdown(f"""
+<div style="background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #ef4444;
+border-radius:14px;padding:1.2rem 1.5rem;">
+  <div style="font-size:0.65rem;font-weight:700;color:#ef4444;text-transform:uppercase;
+  letter-spacing:0.1em;margin-bottom:0.5rem;">Error</div>
+  <div style="font-size:0.82rem;color:#991b1b;font-family:monospace;">{err_safe}</div>
+</div>
+""", unsafe_allow_html=True)
 
 
 # =============================================================================
