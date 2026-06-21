@@ -13,12 +13,12 @@ import streamlit as st
 
 st.set_page_config(
     page_title="StreamLake",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 def _secret(key: str, default: str = "") -> str:
-    """Read from Streamlit Cloud secrets first, then env vars, then default."""
     try:
         return st.secrets[key]
     except Exception:
@@ -40,172 +40,173 @@ if _endpoint:
     STORAGE_OPTIONS["AWS_ALLOW_HTTP"] = "true"
 
 CHART_LAYOUT = dict(
-    template="plotly_dark",
+    template="plotly_white",
     paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="Inter, sans-serif", color="#a0aec0", size=12),
+    plot_bgcolor="rgba(248,250,255,0.6)",
+    font=dict(family="Inter, sans-serif", color="#475569", size=12),
     margin=dict(t=20, b=20, l=10, r=10),
 )
-PURPLE = "#8b5cf6"
-TEAL   = "#00d4aa"
-RED    = "#ef4444"
+INDIGO  = "#6366f1"
+VIOLET  = "#8b5cf6"
+CYAN    = "#06b6d4"
+EMERALD = "#10b981"
+AMBER   = "#f59e0b"
+RED     = "#ef4444"
+CHART_COLORS = [INDIGO, VIOLET, CYAN, EMERALD, AMBER, "#f43f5e"]
+
+# ── Global styles ────────────────────────────────────────────────────────────
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
-.stApp { background: #080c18; font-family: 'Inter', sans-serif; }
-#MainMenu, footer { visibility: hidden; }
-.block-container { padding: 1.5rem 2rem 2rem; max-width: 1400px; }
+.stApp { background: #f0f4ff; font-family: 'Inter', sans-serif; }
+#MainMenu, footer, header { visibility: hidden; }
+.block-container { padding: 0 2rem 3rem; max-width: 1300px; }
 
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0d1117; }
-::-webkit-scrollbar-thumb { background: #8b5cf6; border-radius: 3px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #f0f4ff; }
+::-webkit-scrollbar-thumb { background: #c7d2fe; border-radius: 10px; }
 
-.hero {
-    background: linear-gradient(135deg, #0d0d1f 0%, #1a1035 50%, #0d1a35 100%);
-    border: 1px solid rgba(139,92,246,0.25);
-    border-radius: 16px;
-    padding: 1.8rem 2rem;
-    margin-bottom: 1.5rem;
-}
-.hero-title {
-    font-size: 2rem; font-weight: 800; color: #fff;
-    margin: 0 0 0.5rem; line-height: 1.2;
-}
-.hero-title span {
-    background: linear-gradient(90deg, #8b5cf6, #06b6d4);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-}
-.hero-sub { font-size: 0.85rem; color: #64748b; line-height: 1.6; }
-.hero-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 0.9rem; }
-.tag {
-    background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.2);
-    color: #a78bfa; border-radius: 20px; padding: 3px 10px;
-    font-size: 0.7rem; font-weight: 500;
-}
+/* Sidebar */
+[data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #e0e7ff; }
+[data-testid="stSidebar"] .block-container { padding: 1.5rem 1.2rem; }
 
+/* Cards */
 .card {
-    background: linear-gradient(160deg, #10162a 0%, #141d30 100%);
-    border: 1px solid rgba(139,92,246,0.12);
-    border-radius: 14px;
-    padding: 1.3rem 1.4rem;
-    transition: all 0.25s ease;
-    height: 100%;
+    background: #ffffff; border-radius: 20px; padding: 1.5rem 1.6rem;
+    box-shadow: 0 1px 4px rgba(99,102,241,0.07), 0 6px 24px rgba(99,102,241,0.05);
+    border: 1px solid rgba(99,102,241,0.08); height: 100%;
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
 }
-.card:hover {
-    border-color: rgba(139,92,246,0.4);
-    transform: translateY(-3px);
-    box-shadow: 0 12px 30px rgba(139,92,246,0.08);
+.card:hover { transform: translateY(-3px); box-shadow: 0 8px 32px rgba(99,102,241,0.13); }
+
+/* Metric cards */
+.mcard {
+    background: #ffffff; border-radius: 20px; padding: 1.4rem 1.6rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 6px 20px rgba(0,0,0,0.03);
+    border: 1px solid #f1f5f9; border-left: 4px solid;
+    transition: transform 0.2s ease;
 }
-.card-val   { font-size: 1.8rem; font-weight: 800; color: #f1f5f9; line-height: 1; }
-.card-label { font-size: 0.7rem; color: #475569; text-transform: uppercase;
-              letter-spacing: 0.1em; margin-top: 0.3rem; }
-.card-sub   { font-size: 0.78rem; margin-top: 0.4rem; font-weight: 500; }
-.sub-green  { color: #00d4aa; }
-.sub-purple { color: #8b5cf6; }
-.sub-blue   { color: #38bdf8; }
-.sub-orange { color: #fb923c; }
-.sub-muted  { color: #ef4444; }
+.mcard:hover { transform: translateY(-2px); }
+.mi { border-left-color: #6366f1; }
+.mv { border-left-color: #8b5cf6; }
+.me { border-left-color: #10b981; }
+.ma { border-left-color: #f59e0b; }
 
-.section-hdr { display: flex; align-items: center; gap: 10px; margin: 1.5rem 0 1rem; }
-.section-hdr span { font-size: 0.85rem; font-weight: 600; color: #e2e8f0; white-space: nowrap; }
-.section-hdr::after { content: ''; flex: 1; height: 1px; background: rgba(139,92,246,0.12); }
+.card-val   { font-size: 2.1rem; font-weight: 800; color: #0f172a; line-height: 1.1; }
+.card-label { font-size: 0.67rem; color: #94a3b8; text-transform: uppercase;
+              letter-spacing: 0.13em; margin-bottom: 0.45rem; font-weight: 600; }
+.card-sub   { font-size: 0.77rem; margin-top: 0.45rem; font-weight: 500; }
+.si { color: #6366f1; } .sv { color: #8b5cf6; } .se { color: #10b981; }
+.sa { color: #f59e0b; } .sr { color: #ef4444; } .sm { color: #94a3b8; }
 
-.dot-green { width:8px; height:8px; border-radius:50%; background:#00d4aa;
-             display:inline-block; box-shadow:0 0 6px #00d4aa; }
-.dot-red   { width:8px; height:8px; border-radius:50%; background:#ef4444;
-             display:inline-block; box-shadow:0 0 6px #ef4444; }
-.svc-row   { display:flex; align-items:center; gap:8px; font-size:0.8rem;
-             color:#94a3b8; padding:4px 0; }
-.svc-name  { flex:1; }
+/* Section headers */
+.section-hdr { display: flex; align-items: center; gap: 10px; margin: 1.8rem 0 1rem; }
+.section-hdr span { font-size: 0.78rem; font-weight: 700; color: #0f172a;
+                    text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap; }
+.section-hdr::after { content: ''; flex: 1; height: 1px; background: #e0e7ff; }
 
-.phase-row { display:flex; align-items:center; gap:8px; font-size:0.78rem;
-             color:#64748b; padding:3px 0; }
-.phase-num { font-weight:700; color:#8b5cf6; min-width:20px; }
-.phase-check { color:#00d4aa; }
+.divider { height: 1px; background: #e0e7ff; margin: 1.2rem 0; }
 
-.pred-card {
-    background: linear-gradient(160deg, #10162a 0%, #141d30 100%);
-    border: 1px solid rgba(139,92,246,0.2);
-    border-radius: 16px;
-    padding: 1.8rem;
-    text-align: center;
-}
-.prob-num  { font-size: 3.5rem; font-weight: 900; line-height: 1; margin-bottom: 0.2rem; }
-.prob-high { color: #ef4444; text-shadow: 0 0 30px rgba(239,68,68,0.3); }
-.prob-low  { color: #00d4aa; text-shadow: 0 0 30px rgba(0,212,170,0.3); }
-.prob-lbl  { font-size: 0.7rem; color: #475569; text-transform: uppercase; letter-spacing: 0.12em; }
-.pred-badge { display:inline-block; border-radius:8px; padding:5px 16px;
-              font-size:0.82rem; font-weight:700; margin-top:0.8rem; }
-.pred-high { background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.3); }
-.pred-low  { background:rgba(0,212,170,0.1); color:#00d4aa; border:1px solid rgba(0,212,170,0.3); }
+/* Sidebar labels */
+.sidebar-label { font-size: 0.62rem; font-weight: 700; color: #94a3b8;
+                 text-transform: uppercase; letter-spacing: 0.14em; margin-bottom: 0.6rem; }
+.dot-green { width: 7px; height: 7px; border-radius: 50%; background: #10b981;
+             display: inline-block; box-shadow: 0 0 0 3px rgba(16,185,129,0.15); }
+.dot-red   { width: 7px; height: 7px; border-radius: 50%; background: #ef4444;
+             display: inline-block; box-shadow: 0 0 0 3px rgba(239,68,68,0.15); }
+.svc-row  { display: flex; align-items: center; gap: 9px; font-size: 0.8rem;
+            color: #475569; padding: 5px 0; }
+.svc-name { flex: 1; }
+.phase-row  { display: flex; align-items: flex-start; gap: 10px; font-size: 0.78rem;
+              color: #475569; padding: 4px 0; }
+.phase-num  { font-weight: 700; color: #6366f1; min-width: 22px; font-size: 0.72rem; }
+.phase-check { color: #10b981; }
 
-.psi-stable   { background:rgba(0,212,170,0.08);  color:#00d4aa; border:1px solid rgba(0,212,170,0.25);
-                border-radius:6px; padding:2px 10px; font-size:0.7rem; font-weight:600; }
-.psi-moderate { background:rgba(251,191,36,0.08); color:#fbbf24; border:1px solid rgba(251,191,36,0.25);
-                border-radius:6px; padding:2px 10px; font-size:0.7rem; font-weight:600; }
-.psi-retrain  { background:rgba(239,68,68,0.08);  color:#ef4444; border:1px solid rgba(239,68,68,0.25);
-                border-radius:6px; padding:2px 10px; font-size:0.7rem; font-weight:600; }
-
+/* Tabs */
 .stTabs [data-baseweb="tab-list"] {
-    background:transparent; gap:6px;
-    border-bottom: 1px solid rgba(139,92,246,0.12); padding-bottom:0;
+    background: transparent; gap: 2px;
+    border-bottom: 2px solid #e0e7ff; padding-bottom: 0;
 }
 .stTabs [data-baseweb="tab"] {
-    background:rgba(139,92,246,0.04);
-    border:1px solid rgba(139,92,246,0.1); border-bottom:none;
-    border-radius:10px 10px 0 0;
-    color:#64748b; padding:0.5rem 1.3rem;
-    font-size:0.85rem; font-weight:500;
+    background: transparent; border: none; color: #64748b;
+    padding: 0.65rem 1.5rem; font-size: 0.85rem; font-weight: 500;
+    border-radius: 0; border-bottom: 2px solid transparent; margin-bottom: -2px;
+    transition: color 0.15s;
 }
 .stTabs [aria-selected="true"] {
-    background:rgba(139,92,246,0.14) !important;
-    color:#a78bfa !important;
-    border-color:rgba(139,92,246,0.35) !important;
+    background: transparent !important; color: #6366f1 !important;
+    border-bottom: 2px solid #6366f1 !important; font-weight: 700 !important;
 }
+.stTabs [data-baseweb="tab"]:hover { color: #6366f1 !important; }
 
-.stTextInput input {
-    background:#0d1117; border:1px solid rgba(139,92,246,0.25);
-    border-radius:10px; color:#f1f5f9; font-size:0.9rem; padding:0.6rem 1rem;
+/* Predict result */
+.pred-card {
+    background: #ffffff; border-radius: 24px; padding: 2rem 1.8rem; text-align: center;
+    box-shadow: 0 4px 24px rgba(99,102,241,0.1); border: 1px solid #e0e7ff;
 }
-.stTextInput input:focus {
-    border-color:#8b5cf6; box-shadow:0 0 0 3px rgba(139,92,246,0.12); outline:none;
-}
+.prob-num  { font-size: 4rem; font-weight: 900; line-height: 1; margin-bottom: 0.25rem; }
+.prob-high { color: #ef4444; }
+.prob-low  { color: #10b981; }
+.prob-lbl  { font-size: 0.67rem; color: #94a3b8; text-transform: uppercase;
+             letter-spacing: 0.14em; }
+.pred-badge { display: inline-block; border-radius: 100px; padding: 5px 18px;
+              font-size: 0.79rem; font-weight: 700; margin-top: 0.7rem; }
+.pred-high { background: #fef2f2; color: #ef4444; }
+.pred-low  { background: #ecfdf5; color: #10b981; }
 
+/* PSI badges */
+.psi-stable   { background:#ecfdf5; color:#10b981; border-radius:6px;
+                padding:2px 10px; font-size:0.7rem; font-weight:600; }
+.psi-moderate { background:#fffbeb; color:#f59e0b; border-radius:6px;
+                padding:2px 10px; font-size:0.7rem; font-weight:600; }
+.psi-retrain  { background:#fef2f2; color:#ef4444; border-radius:6px;
+                padding:2px 10px; font-size:0.7rem; font-weight:600; }
+
+/* Buttons */
 .stButton > button {
-    border-radius:10px; font-weight:500; font-size:0.85rem;
-    border:1px solid rgba(139,92,246,0.25); color:#a78bfa;
-    background:rgba(139,92,246,0.06); transition:all 0.2s;
+    border-radius: 12px; font-weight: 600; font-size: 0.85rem;
+    border: 1.5px solid #c7d2fe; color: #6366f1;
+    background: #eef2ff; transition: all 0.2s; padding: 0.5rem 1.2rem;
 }
 .stButton > button:hover {
-    border-color:rgba(139,92,246,0.5); background:rgba(139,92,246,0.12);
+    border-color: #6366f1; background: #e0e7ff; transform: translateY(-1px);
 }
 .stButton > button[kind="primary"] {
-    background:linear-gradient(135deg,#7c3aed,#5b21b6);
-    color:#fff; border:none; box-shadow:0 4px 15px rgba(124,58,237,0.3);
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff; border: none; box-shadow: 0 4px 15px rgba(99,102,241,0.35);
 }
 .stButton > button[kind="primary"]:hover {
-    background:linear-gradient(135deg,#8b5cf6,#6d28d9); transform:translateY(-1px);
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    transform: translateY(-2px); box-shadow: 0 6px 20px rgba(99,102,241,0.4);
 }
 
-[data-testid="stSidebar"] {
-    background: #080c18 !important;
-    border-right: 1px solid rgba(139,92,246,0.1);
+/* Text input */
+.stTextInput input {
+    background: #f8faff; border: 1.5px solid #c7d2fe;
+    border-radius: 12px; color: #0f172a; font-size: 0.9rem; padding: 0.6rem 1rem;
 }
-[data-testid="stSidebar"] .block-container { padding: 1.5rem 1rem; }
-
-.divider { height:1px; background:rgba(139,92,246,0.1); margin:1.2rem 0; }
-
-.sidebar-label {
-    font-size:0.65rem; font-weight:700; color:#334155;
-    text-transform:uppercase; letter-spacing:0.12em; margin-bottom:0.5rem;
+.stTextInput input:focus {
+    border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+    outline: none; background: #fff;
 }
+
+/* How it works design cards */
+.how-card {
+    background: #ffffff; border-radius: 20px; padding: 1.6rem;
+    box-shadow: 0 1px 4px rgba(99,102,241,0.06), 0 6px 24px rgba(99,102,241,0.05);
+    border: 1px solid rgba(99,102,241,0.08); height: 100%;
+}
+.how-icon { font-size: 1.8rem; margin-bottom: 0.8rem; }
+.how-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+             letter-spacing: 0.1em; margin-bottom: 0.7rem; }
+.how-body { font-size: 0.82rem; color: #475569; line-height: 1.75; }
 </style>
 """, unsafe_allow_html=True)
 
 
-# -- helpers ------------------------------------------------------------------
+# ── Helpers ──────────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=30)
 def load_delta(path: str) -> pd.DataFrame:
@@ -224,17 +225,20 @@ def check_svc(url: str, timeout: float = 5.0) -> bool:
         return False
 
 def dot(ok: bool) -> str:
-    cls = "dot-green" if ok else "dot-red"
-    return f'<span class="{cls}"></span>'
+    return f'<span class="{"dot-green" if ok else "dot-red"}"></span>'
 
 
-# -- sidebar ------------------------------------------------------------------
+# ── Sidebar ───────────────────────────────────────────────────────────────────
 
 with st.sidebar:
     st.markdown("""
-<div style="padding:0.5rem 0 1.2rem;">
-  <div style="font-size:1.2rem;font-weight:800;color:#f1f5f9;letter-spacing:-0.01em;">StreamLake</div>
-  <div style="font-size:0.72rem;color:#475569;margin-top:3px;">Data Lakehouse / ML Feature Store</div>
+<div style="padding:0.5rem 0 1.4rem;">
+  <div style="font-size:1.25rem;font-weight:900;color:#0f172a;letter-spacing:-0.02em;">
+    Stream<span style="color:#6366f1;">Lake</span>
+  </div>
+  <div style="font-size:0.72rem;color:#94a3b8;margin-top:4px;font-weight:500;">
+    Real-Time Churn Intelligence
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -254,7 +258,7 @@ with st.sidebar:
             f'<div class="svc-row">{dot(ok)}'
             f'<span class="svc-name">{name}</span>'
             f'<a href="{url}" target="_blank" '
-            f'style="color:#8b5cf6;font-size:0.65rem;text-decoration:none;">open</a></div>',
+            f'style="color:#6366f1;font-size:0.65rem;font-weight:600;text-decoration:none;">open</a></div>',
             unsafe_allow_html=True,
         )
 
@@ -262,11 +266,11 @@ with st.sidebar:
 
     st.markdown('<div class="sidebar-label">Build Phases</div>', unsafe_allow_html=True)
     phases = [
-        ("Ingestion",     "Kafka to Bronze Delta"),
+        ("Ingestion",     "Kafka + Delta Bronze"),
         ("Processing",    "Bronze to Silver"),
         ("Aggregation",   "Silver to Gold"),
-        ("Feature Store", "Feast + Redis + Delta"),
-        ("ML",            "XGBoost + FastAPI"),
+        ("Feature Store", "Feast + Redis"),
+        ("ML Serving",    "XGBoost + FastAPI"),
         ("Observability", "PSI + Prometheus"),
     ]
     for i, (name, desc) in enumerate(phases, 1):
@@ -275,8 +279,8 @@ with st.sidebar:
             f'<span class="phase-num">0{i}</span>'
             f'<span class="phase-check">&#10003;</span>'
             f'<div>'
-            f'<div style="color:#94a3b8;font-size:0.78rem;">{name}</div>'
-            f'<div style="color:#334155;font-size:0.68rem;">{desc}</div>'
+            f'<div style="color:#0f172a;font-size:0.78rem;font-weight:500;">{name}</div>'
+            f'<div style="color:#94a3b8;font-size:0.68rem;">{desc}</div>'
             f'</div></div>',
             unsafe_allow_html=True,
         )
@@ -284,55 +288,79 @@ with st.sidebar:
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="sidebar-label">Stack</div>', unsafe_allow_html=True)
-    techs = ["Kafka", "Delta Lake", "PyFlink", "Feast", "Redis",
-             "XGBoost", "MLflow", "FastAPI", "SHAP", "Prometheus", "DuckDB"]
+    techs = ["Kafka", "Delta Lake", "Feast", "Redis", "XGBoost",
+             "MLflow", "FastAPI", "SHAP", "Prometheus", "DuckDB", "AWS S3"]
     pills = "".join(
-        f'<span style="display:inline-block;background:rgba(139,92,246,0.08);'
-        f'border:1px solid rgba(139,92,246,0.2);color:#8b5cf6;border-radius:20px;'
-        f'padding:2px 9px;font-size:0.67rem;margin:2px;">{t}</span>'
+        f'<span style="display:inline-block;background:#eef2ff;border:1px solid #c7d2fe;'
+        f'color:#6366f1;border-radius:100px;padding:3px 10px;font-size:0.67rem;'
+        f'font-weight:600;margin:2px;">{t}</span>'
         for t in techs
     )
     st.markdown(pills, unsafe_allow_html=True)
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
     st.markdown("""
-<div style="font-size:0.65rem;font-weight:700;color:#334155;
-text-transform:uppercase;letter-spacing:0.12em;margin-bottom:0.5rem;">Author</div>
-<div style="font-size:0.88rem;font-weight:700;color:#e2e8f0;">Kunal Pasad</div>
-<div style="font-size:0.72rem;color:#475569;margin-top:2px;">SPIT Mumbai</div>
-<div style="margin-top:0.6rem;">
+<div style="font-size:0.62rem;font-weight:700;color:#94a3b8;
+text-transform:uppercase;letter-spacing:0.14em;margin-bottom:0.5rem;">Author</div>
+<div style="font-size:0.9rem;font-weight:800;color:#0f172a;">Kunal Pasad</div>
+<div style="font-size:0.72rem;color:#64748b;margin-top:2px;">SPIT Mumbai</div>
+<div style="margin-top:0.7rem;">
   <a href="https://github.com/PasadKunal/streamlake" target="_blank"
-     style="font-size:0.72rem;color:#8b5cf6;text-decoration:none;">
+     style="font-size:0.72rem;color:#6366f1;font-weight:600;text-decoration:none;">
     github.com/PasadKunal/streamlake
   </a>
 </div>
 """, unsafe_allow_html=True)
 
 
-# -- hero ---------------------------------------------------------------------
+# ── Hero ─────────────────────────────────────────────────────────────────────
 
 st.markdown("""
-<div class="hero">
-  <div class="hero-title"><span>StreamLake</span></div>
-  <div class="hero-sub">
-    A real-time data lakehouse I built to learn stream processing, feature stores, and ML serving.
-    Kafka to Delta Lake to Feast to XGBoost to FastAPI. 6 phases, 133 tests.
+<div style="background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 55%,#06b6d4 100%);
+border-radius:24px;padding:2.6rem 2.8rem;margin:1.5rem 0 1.8rem;position:relative;overflow:hidden;">
+
+  <div style="position:absolute;top:-50px;right:-50px;width:220px;height:220px;
+  border-radius:50%;background:rgba(255,255,255,0.07);"></div>
+  <div style="position:absolute;bottom:-70px;right:120px;width:170px;height:170px;
+  border-radius:50%;background:rgba(255,255,255,0.05);"></div>
+  <div style="position:absolute;top:20px;right:180px;width:80px;height:80px;
+  border-radius:50%;background:rgba(255,255,255,0.04);"></div>
+
+  <div style="font-size:0.7rem;font-weight:700;color:rgba(255,255,255,0.55);
+  text-transform:uppercase;letter-spacing:0.18em;margin-bottom:0.7rem;">
+    Real-Time Data Lakehouse
   </div>
-  <div class="hero-tags">
-    <span class="tag">Delta Lake (ACID)</span>
-    <span class="tag">Event-Time Watermarks</span>
-    <span class="tag">Redis Feature Store</span>
-    <span class="tag">XGBoost + MLflow</span>
-    <span class="tag">SHAP Explainability</span>
-    <span class="tag">PSI Drift Detection</span>
-    <span class="tag">A/B Testing</span>
+  <div style="font-size:2.6rem;font-weight:900;color:#fff;line-height:1.1;
+  margin-bottom:0.7rem;letter-spacing:-0.02em;">
+    StreamLake
+  </div>
+  <div style="font-size:0.88rem;color:rgba(255,255,255,0.78);line-height:1.75;
+  max-width:620px;margin-bottom:1.4rem;">
+    Predict which customers are about to leave — before they do.
+    Order events flow from Kafka through a Delta Lake medallion pipeline into a
+    Redis feature store, scored live by XGBoost with SHAP explanations.
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;">
+    <span style="background:rgba(255,255,255,0.18);backdrop-filter:blur(8px);color:#fff;
+    border-radius:100px;padding:4px 14px;font-size:0.71rem;font-weight:600;">Delta Lake (ACID)</span>
+    <span style="background:rgba(255,255,255,0.18);backdrop-filter:blur(8px);color:#fff;
+    border-radius:100px;padding:4px 14px;font-size:0.71rem;font-weight:600;">Event-Time Watermarks</span>
+    <span style="background:rgba(255,255,255,0.18);backdrop-filter:blur(8px);color:#fff;
+    border-radius:100px;padding:4px 14px;font-size:0.71rem;font-weight:600;">Redis Feature Store</span>
+    <span style="background:rgba(255,255,255,0.18);backdrop-filter:blur(8px);color:#fff;
+    border-radius:100px;padding:4px 14px;font-size:0.71rem;font-weight:600;">XGBoost + SHAP</span>
+    <span style="background:rgba(255,255,255,0.18);backdrop-filter:blur(8px);color:#fff;
+    border-radius:100px;padding:4px 14px;font-size:0.71rem;font-weight:600;">PSI Drift Detection</span>
+    <span style="background:rgba(255,255,255,0.18);backdrop-filter:blur(8px);color:#fff;
+    border-radius:100px;padding:4px 14px;font-size:0.71rem;font-weight:600;">90/10 A/B Split</span>
+    <span style="background:rgba(255,255,255,0.18);backdrop-filter:blur(8px);color:#fff;
+    border-radius:100px;padding:4px 14px;font-size:0.71rem;font-weight:600;">Multi-Tenant API Keys</span>
   </div>
 </div>
 """, unsafe_allow_html=True)
 
 
-# -- tabs ---------------------------------------------------------------------
+# ── Tabs ─────────────────────────────────────────────────────────────────────
 
 tab1, tab2, tab3, tab4 = st.tabs(["Pipeline", "Predict", "Drift Monitor", "How it works"])
 
@@ -347,45 +375,45 @@ with tab1:
     with c1:
         try:
             bronze = load_delta("s3://streamlake-bronze/events")
-            c1.markdown(f"""<div class="card">
+            c1.markdown(f"""<div class="mcard mi">
                 <div class="card-label">Bronze Events</div>
                 <div class="card-val">{len(bronze):,}</div>
-                <div class="card-sub sub-orange">raw, immutable</div>
+                <div class="card-sub sa">raw, immutable</div>
             </div>""", unsafe_allow_html=True)
         except Exception:
-            c1.markdown('<div class="card"><div class="card-label">Bronze Events</div>'
+            c1.markdown('<div class="mcard mi"><div class="card-label">Bronze Events</div>'
                         '<div class="card-val">--</div>'
-                        '<div class="card-sub sub-muted">run the producer</div></div>',
+                        '<div class="card-sub sm">run the producer</div></div>',
                         unsafe_allow_html=True)
 
     with c2:
         try:
             silver = load_delta("s3://streamlake-silver/events")
             late   = (silver["watermark_classification"] == "late").sum()
-            c2.markdown(f"""<div class="card">
+            c2.markdown(f"""<div class="mcard mv">
                 <div class="card-label">Silver Events</div>
                 <div class="card-val">{len(silver):,}</div>
-                <div class="card-sub sub-green">{late} late, 0 quarantined</div>
+                <div class="card-sub se">{late} late, 0 quarantined</div>
             </div>""", unsafe_allow_html=True)
         except Exception:
-            c2.markdown('<div class="card"><div class="card-label">Silver Events</div>'
+            c2.markdown('<div class="mcard mv"><div class="card-label">Silver Events</div>'
                         '<div class="card-val">--</div>'
-                        '<div class="card-sub sub-muted">run bronze_to_silver</div></div>',
+                        '<div class="card-sub sm">run bronze_to_silver</div></div>',
                         unsafe_allow_html=True)
 
     with c3:
         try:
             fdf        = load_features()
             purchasers = (fdf["purchase_count_24h"] > 0).sum()
-            c3.markdown(f"""<div class="card">
+            c3.markdown(f"""<div class="mcard me">
                 <div class="card-label">Feature Store Users</div>
                 <div class="card-val">{len(fdf):,}</div>
-                <div class="card-sub sub-blue">{purchasers} purchased today</div>
+                <div class="card-sub si">{purchasers:,} purchased today</div>
             </div>""", unsafe_allow_html=True)
         except Exception:
-            c3.markdown('<div class="card"><div class="card-label">Feature Store</div>'
+            c3.markdown('<div class="mcard me"><div class="card-label">Feature Store</div>'
                         '<div class="card-val">--</div>'
-                        '<div class="card-sub sub-muted">run feature_pipeline</div></div>',
+                        '<div class="card-sub sm">run feature_pipeline</div></div>',
                         unsafe_allow_html=True)
 
     with c4:
@@ -397,15 +425,15 @@ with tab1:
             if versions:
                 run = client.get_run(versions[-1].run_id)
                 auc = run.data.metrics.get("auc", 0)
-                c4.markdown(f"""<div class="card">
+                c4.markdown(f"""<div class="mcard ma">
                     <div class="card-label">Model AUC</div>
                     <div class="card-val">{auc:.3f}</div>
-                    <div class="card-sub sub-purple">XGBoost v{versions[-1].version}</div>
+                    <div class="card-sub sv">XGBoost v{versions[-1].version}</div>
                 </div>""", unsafe_allow_html=True)
         except Exception:
-            c4.markdown('<div class="card"><div class="card-label">Model AUC</div>'
+            c4.markdown('<div class="mcard ma"><div class="card-label">Model AUC</div>'
                         '<div class="card-val">--</div>'
-                        '<div class="card-sub sub-muted">run ml.train</div></div>',
+                        '<div class="card-sub sm">run ml.train</div></div>',
                         unsafe_allow_html=True)
 
     st.markdown('<div class="section-hdr"><span>Event Distribution</span></div>',
@@ -420,13 +448,13 @@ with tab1:
             fig = px.bar(
                 counts, x="Count", y="Event Type", orientation="h",
                 color="Count",
-                color_continuous_scale=["#312e81", "#8b5cf6", "#c4b5fd"],
+                color_continuous_scale=[[0, "#c7d2fe"], [0.5, "#818cf8"], [1, "#6366f1"]],
             )
             fig.update_layout(**CHART_LAYOUT, coloraxis_showscale=False, height=290)
             fig.update_traces(marker_line_width=0)
             st.plotly_chart(fig, use_container_width=True)
         except Exception:
-            st.info("No Silver data yet.")
+            st.info("No Silver data yet. Run the pipeline first.")
 
     with right:
         try:
@@ -435,66 +463,70 @@ with tab1:
             dev.columns = ["Device", "Count"]
             fig = px.pie(
                 dev, names="Device", values="Count",
-                color_discrete_sequence=["#8b5cf6", "#06b6d4", "#00d4aa", "#fbbf24"],
-                hole=0.55,
+                color_discrete_sequence=CHART_COLORS,
+                hole=0.58,
             )
             fig.update_layout(
                 **CHART_LAYOUT, showlegend=True, height=290,
-                legend=dict(orientation="v", x=1, y=0.5),
+                legend=dict(orientation="v", x=1, y=0.5,
+                            font=dict(color="#475569", size=12)),
             )
-            fig.update_traces(textinfo="percent", textfont_color="#fff")
+            fig.update_traces(textinfo="percent", textfont_color="#fff",
+                              marker=dict(line=dict(color="#fff", width=2)))
             st.plotly_chart(fig, use_container_width=True)
         except Exception:
-            st.info("No Silver data yet.")
+            st.info("No Silver data yet. Run the pipeline first.")
 
     st.markdown('<div class="section-hdr"><span>Data Flow</span></div>',
                 unsafe_allow_html=True)
-    st.code("""
-  Python Producer  -->  Redpanda (Kafka)  -->  Schema Registry (Avro)
-  ~1,400 events/s        4 partitions          backward compatible
 
-        |
-        v
-  +-----------+   BRONZE  -  raw, immutable, partitioned by date
-  |  MinIO S3 |   Delta Lake, idempotent consumer, at-least-once delivery
-  |  (Delta)  |
-  +-----+-----+
-        |
-        v  watermark / dedup / Great Expectations / quarantine router
-  +-----------+   SILVER  -  validated, deduplicated
-  |  MinIO S3 |   event-time watermarks, LRU dedup (1h TTL),
-  |  (Delta)  |   6 GE validation rules, quarantine side-output
-  +-----+-----+
-        |
-        +---------------------------+
-        v                           v
-  +-----------+  GOLD           +-------------+  FEATURE STORE
-  | DuckDB    |  DAU            | Feast 0.39  |  9 rolling features:
-  |           |  Revenue        | Redis       |  purchase 1h/24h/7d
-  |           |  Funnel         | Delta       |  revenue 1h/24h/7d
-  +-----------+  Aggregations   +------+------+  session_count_24h
-                                       |
-                                       v
-                               XGBoost churn model
-                               MLflow tracking + registry
-                                       |
-                                       v
-                               FastAPI /predict
-                               SHAP explanations
-                               90/10 A/B split
-                               Prometheus + PSI drift
-""", language="text")
+    st.markdown("""
+<div style="background:#ffffff;border:1px solid #e0e7ff;border-radius:16px;
+padding:1.6rem 1.8rem;font-family:monospace;font-size:0.78rem;color:#475569;
+line-height:2;overflow-x:auto;">
+
+<span style="color:#6366f1;font-weight:700;">INGEST</span>
+&nbsp;&nbsp; Kafka / Redpanda &rarr; Avro + Schema Registry &nbsp; ~1,400 events/s
+&nbsp;&nbsp; REST Webhook &rarr; POST /ingest/webhook (Shopify / WooCommerce)
+&nbsp;&nbsp; CSV Upload &nbsp;&rarr; POST /ingest/csv
+
+<span style="color:#f59e0b;font-weight:700;">BRONZE</span>
+&nbsp;&nbsp; s3://streamlake-bronze/events/ &nbsp; raw, immutable, partitioned by date
+&nbsp;&nbsp; Delta Lake (delta-rs, no Spark) &nbsp; idempotent consumer
+
+<span style="color:#8b5cf6;font-weight:700;">SILVER</span>
+&nbsp;&nbsp; Event-time watermarks &middot; LRU dedup (1h TTL)
+&nbsp;&nbsp; 6 Great Expectations rules &middot; quarantine side-output
+
+<span style="color:#10b981;font-weight:700;">GOLD &nbsp;</span>
+&nbsp;&nbsp; DuckDB aggregations &rarr; DAU, revenue, funnel, user signals
+
+<span style="color:#06b6d4;font-weight:700;">FEATURES</span>
+&nbsp;&nbsp; Feast 0.39 &rarr; Redis online store (sub-10ms retrieval)
+&nbsp;&nbsp; 9 rolling features: purchases &amp; revenue over 1h / 24h / 7d
+
+<span style="color:#ef4444;font-weight:700;">SERVE</span>
+&nbsp;&nbsp; POST /predict &rarr; XGBoost &middot; SHAP &middot; 90/10 A/B &middot; Prometheus
+&nbsp;&nbsp; GET  /alerts &nbsp;&rarr; Redis sorted-set range query (O log N)
+
+</div>
+""", unsafe_allow_html=True)
 
 
 # =============================================================================
 # TAB 2 - PREDICT
 # =============================================================================
 with tab2:
+
     st.markdown("""
-<div style="color:#64748b;font-size:0.85rem;margin-bottom:1.2rem;">
-Features are fetched live from Redis.
-Model is loaded from the MLflow registry.
-SHAP shows which features drove the score.
+<div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:14px;
+padding:1rem 1.3rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12px;">
+  <div style="font-size:1.3rem;"></div>
+  <div style="font-size:0.84rem;color:#4338ca;line-height:1.6;">
+    Features are fetched live from <strong>Redis</strong> in under 10ms.
+    The model runs <strong>SHAP</strong> to explain every score.
+    First request may take ~30s to wake the Render free-tier API.
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -504,7 +536,7 @@ SHAP shows which features drove the score.
                                 placeholder="e.g. USER-006775",
                                 label_visibility="collapsed")
     with col_btn:
-        go_btn = st.button("Predict", type="primary", use_container_width=True)
+        go_btn = st.button("Predict churn", type="primary", use_container_width=True)
     with col_rnd:
         if st.button("Random user", use_container_width=True):
             try:
@@ -519,22 +551,23 @@ SHAP shows which features drove the score.
         go_btn  = True
 
     if go_btn:
-        with st.spinner("Fetching features and running model (first request may take ~30s to wake API)..."):
+        with st.spinner("Scoring customer... (first call may take ~30s to wake API)"):
             try:
                 resp = requests.post(
                     f"{API_URL}/predict", json={"user_id": user_id},
                     headers=_API_HEADERS, timeout=60
                 )
             except requests.exceptions.ConnectionError:
-                st.error(f"Cannot connect to API at {API_URL}. Check that RENDER is running.")
+                st.error(f"Cannot connect to API at {API_URL}.")
                 st.stop()
             except requests.exceptions.Timeout:
-                st.error("API timed out after 60s. The Render free tier may be overloaded — try again.")
+                st.error("API timed out after 60s. Try again in a moment.")
                 st.stop()
+
         if resp.status_code == 404:
-            st.warning(f"User `{user_id}` not in feature store.")
+            st.warning(f"User `{user_id}` not found in feature store.")
         elif resp.status_code != 200:
-            st.error(f"API returned {resp.status_code}: {resp.json().get('detail', 'unknown')}")
+            st.error(f"API error {resp.status_code}: {resp.json().get('detail', 'unknown')}")
         else:
             data = resp.json()
             prob = data["churn_probability"]
@@ -552,25 +585,35 @@ SHAP shows which features drove the score.
   <div class="prob-lbl">Churn Probability</div>
   <div class="prob-num {cls}">{prob:.0%}</div>
   <div class="pred-badge {badge_cls}">{badge_text}</div>
-  <div style="margin-top:1.2rem;display:flex;gap:12px;justify-content:center;">
+  <div style="margin-top:1.4rem;padding-top:1rem;border-top:1px solid #f1f5f9;
+  display:flex;gap:12px;justify-content:center;">
     <div style="text-align:center;">
-      <div style="font-size:0.65rem;color:#475569;text-transform:uppercase;letter-spacing:0.08em;">Model</div>
-      <div style="font-size:0.82rem;color:#a78bfa;font-weight:600;">v{data['model_version']}</div>
+      <div style="font-size:0.62rem;color:#94a3b8;text-transform:uppercase;
+      letter-spacing:0.1em;margin-bottom:2px;">Model</div>
+      <div style="font-size:0.82rem;color:#6366f1;font-weight:700;">
+        v{data['model_version']}</div>
     </div>
+    <div style="width:1px;background:#e0e7ff;"></div>
     <div style="text-align:center;">
-      <div style="font-size:0.65rem;color:#475569;text-transform:uppercase;letter-spacing:0.08em;">A/B Group</div>
-      <div style="font-size:0.82rem;color:#06b6d4;font-weight:600;">{data['ab_group'].title()}</div>
+      <div style="font-size:0.62rem;color:#94a3b8;text-transform:uppercase;
+      letter-spacing:0.1em;margin-bottom:2px;">A/B Group</div>
+      <div style="font-size:0.82rem;color:#06b6d4;font-weight:700;">
+        {data['ab_group'].title()}</div>
     </div>
   </div>
 </div>
 """, unsafe_allow_html=True)
 
             with r2:
-                st.markdown("**SHAP feature contributions**")
-                st.caption("Positive value = pushes toward churn. Negative = away from churn.")
+                st.markdown(
+                    '<div style="font-weight:700;color:#0f172a;font-size:0.9rem;'
+                    'margin-bottom:0.3rem;">SHAP Feature Contributions</div>',
+                    unsafe_allow_html=True,
+                )
+                st.caption("Positive value pushes toward churn. Negative pushes away.")
                 shap_df = pd.DataFrame(data["top_features"])
                 colors  = [
-                    "#ef4444" if d == "increases_churn" else "#00d4aa"
+                    "#ef4444" if d == "increases_churn" else "#10b981"
                     for d in shap_df["direction"]
                 ]
                 fig = go.Figure(go.Bar(
@@ -581,62 +624,69 @@ SHAP shows which features drove the score.
                     marker_line_width=0,
                     text=[f"{v:+.3f}" for v in shap_df["shap_value"]],
                     textposition="outside",
-                    textfont=dict(color="#a0aec0", size=11),
+                    textfont=dict(color="#475569", size=11),
                 ))
                 fig.update_layout(
-                    **CHART_LAYOUT, height=200,
+                    **CHART_LAYOUT, height=210,
                     xaxis_title="SHAP value",
-                    yaxis={"autorange": "reversed", "tickfont": {"size": 11}},
-                    xaxis={"zeroline": True, "zerolinecolor": "rgba(139,92,246,0.3)"},
+                    yaxis={"autorange": "reversed", "tickfont": {"size": 11, "color": "#475569"}},
+                    xaxis={"zeroline": True, "zerolinecolor": "#c7d2fe", "zerolinewidth": 1.5},
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
             with r3:
-                st.markdown("**Feature values (from Redis)**")
-                st.caption("9 rolling-window features computed over the last 1h, 24h, and 7d.")
+                st.markdown(
+                    '<div style="font-weight:700;color:#0f172a;font-size:0.9rem;'
+                    'margin-bottom:0.3rem;">Feature Values (from Redis)</div>',
+                    unsafe_allow_html=True,
+                )
+                st.caption("9 rolling-window features over 1h, 24h, and 7d.")
                 feat = data["features_used"]
                 rows = [
-                    {
-                        "Feature": k,
-                        "Value": f"{int(v):,}" if isinstance(v, (int, float)) else v,
-                    }
+                    {"Feature": k,
+                     "Value": f"{int(v):,}" if isinstance(v, (int, float)) else v}
                     for k, v in feat.items()
                 ]
                 st.dataframe(pd.DataFrame(rows), hide_index=True,
                              use_container_width=True, height=220)
 
             st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+
             fig_g = go.Figure(go.Indicator(
                 mode="gauge+number+delta",
                 value=prob * 100,
                 number={
                     "suffix": "%",
-                    "font": {"size": 48, "color": "#ef4444" if prob >= 0.5 else "#00d4aa"},
+                    "font": {"size": 48,
+                             "color": "#ef4444" if prob >= 0.5 else "#10b981"},
                 },
                 delta={
                     "reference": 50, "suffix": "% vs threshold",
                     "font": {"size": 14},
-                    "decreasing": {"color": "#00d4aa"},
+                    "decreasing": {"color": "#10b981"},
                     "increasing": {"color": "#ef4444"},
                 },
                 gauge={
-                    "axis":  {"range": [0, 100], "tickcolor": "#475569", "tickwidth": 1},
-                    "bar":   {"color": "#ef4444" if prob >= 0.5 else "#00d4aa", "thickness": 0.25},
+                    "axis":  {"range": [0, 100], "tickcolor": "#94a3b8", "tickwidth": 1},
+                    "bar":   {"color": "#ef4444" if prob >= 0.5 else "#10b981",
+                              "thickness": 0.25},
                     "bgcolor": "rgba(0,0,0,0)",
-                    "bordercolor": "rgba(139,92,246,0.2)",
+                    "bordercolor": "#e0e7ff",
                     "steps": [
-                        {"range": [0, 30],   "color": "rgba(0,212,170,0.08)"},
-                        {"range": [30, 60],  "color": "rgba(251,191,36,0.06)"},
-                        {"range": [60, 100], "color": "rgba(239,68,68,0.08)"},
+                        {"range": [0, 30],   "color": "rgba(16,185,129,0.06)"},
+                        {"range": [30, 60],  "color": "rgba(245,158,11,0.05)"},
+                        {"range": [60, 100], "color": "rgba(239,68,68,0.06)"},
                     ],
-                    "threshold": {"line": {"color": "#8b5cf6", "width": 2}, "value": 50},
+                    "threshold": {
+                        "line": {"color": "#6366f1", "width": 2}, "value": 50
+                    },
                 },
                 title={"text": f"Risk score for {user_id}",
                        "font": {"color": "#64748b", "size": 13}},
             ))
             fig_g.update_layout(
                 paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(family="Inter", color="#a0aec0"),
+                font=dict(family="Inter", color="#475569"),
                 height=250, margin=dict(t=40, b=0, l=30, r=30),
             )
             st.plotly_chart(fig_g, use_container_width=True)
@@ -646,10 +696,13 @@ SHAP shows which features drove the score.
 # TAB 3 - DRIFT MONITOR
 # =============================================================================
 with tab3:
+
     st.markdown("""
-<div style="color:#64748b;font-size:0.85rem;margin-bottom:1.2rem;">
-Population Stability Index (PSI) measures how much each feature's distribution has shifted
-since training. PSI below 0.10 is stable. Above 0.25 means the model should be retrained.
+<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;
+padding:1rem 1.3rem;margin-bottom:1.5rem;font-size:0.84rem;color:#166534;line-height:1.6;">
+  <strong>Population Stability Index (PSI)</strong> measures how much each feature's
+  distribution has shifted since training. PSI below 0.10 is stable. Above 0.25
+  means the model should be retrained.
 </div>
 """, unsafe_allow_html=True)
 
@@ -663,10 +716,17 @@ since training. PSI below 0.10 is stable. Above 0.25 means the model should be r
             st.success("All features stable. PSI within safe thresholds.")
 
         st.markdown(f"""
-<div style="display:flex;gap:2rem;font-size:0.8rem;color:#64748b;margin:0.8rem 0 1.2rem;">
-  <span>Baseline: <strong style="color:#a78bfa">{report['baseline_computed_at'][:10]}</strong></span>
-  <span>Training samples: <strong style="color:#a78bfa">{report['baseline_n_samples']:,}</strong></span>
-  <span>Current samples: <strong style="color:#a78bfa">{report['current_n_samples']:,}</strong></span>
+<div style="display:flex;gap:2rem;font-size:0.8rem;color:#64748b;margin:0.8rem 0 1.2rem;
+flex-wrap:wrap;">
+  <span>Baseline:
+    <strong style="color:#6366f1">{report['baseline_computed_at'][:10]}</strong>
+  </span>
+  <span>Training samples:
+    <strong style="color:#6366f1">{report['baseline_n_samples']:,}</strong>
+  </span>
+  <span>Current samples:
+    <strong style="color:#6366f1">{report['current_n_samples']:,}</strong>
+  </span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -682,7 +742,7 @@ since training. PSI below 0.10 is stable. Above 0.25 means the model should be r
             })
         df = pd.DataFrame(rows).sort_values("psi", ascending=False)
 
-        color_map = {"stable": TEAL, "moderate": "#fbbf24", "retrain": RED}
+        color_map = {"stable": EMERALD, "moderate": AMBER, "retrain": RED}
 
         fig = go.Figure()
         for status in ["retrain", "moderate", "stable"]:
@@ -697,12 +757,12 @@ since training. PSI below 0.10 is stable. Above 0.25 means the model should be r
                 marker_line_width=0,
                 text=[f"{v:.5f}" for v in sub["psi"]],
                 textposition="outside",
-                textfont=dict(color="#a0aec0", size=11),
+                textfont=dict(color="#475569", size=11),
             ))
         fig.add_vline(
-            x=0.10, line_dash="dot", line_color="#fbbf24",
+            x=0.10, line_dash="dot", line_color=AMBER,
             annotation_text="monitor (0.10)",
-            annotation_font_color="#fbbf24", annotation_font_size=11,
+            annotation_font_color=AMBER, annotation_font_size=11,
         )
         fig.add_vline(
             x=0.25, line_dash="dot", line_color=RED,
@@ -714,7 +774,8 @@ since training. PSI below 0.10 is stable. Above 0.25 means the model should be r
             barmode="overlay",
             xaxis_title="PSI Score",
             yaxis={"autorange": "reversed"},
-            legend=dict(orientation="h", x=0.5, xanchor="center", y=1.08),
+            legend=dict(orientation="h", x=0.5, xanchor="center", y=1.08,
+                        font=dict(color="#475569")),
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -726,7 +787,6 @@ since training. PSI below 0.10 is stable. Above 0.25 means the model should be r
             "moderate": '<span class="psi-moderate">Moderate</span>',
             "retrain":  '<span class="psi-retrain">Retrain</span>',
         }
-
         header  = "| Feature | PSI | Status | Baseline mean | Current mean | Delta |"
         sep     = "|---------|-----|--------|---------------|--------------|-------|"
         rows_md = [header, sep]
@@ -751,44 +811,41 @@ since training. PSI below 0.10 is stable. Above 0.25 means the model should be r
 # =============================================================================
 with tab4:
 
-    # ── Architecture diagram ──────────────────────────────────────────────────
     st.markdown('<div class="section-hdr"><span>Architecture</span></div>',
                 unsafe_allow_html=True)
 
     st.markdown("""
-<div style="background:linear-gradient(160deg,#10162a,#141d30);border:1px solid rgba(139,92,246,0.15);
-border-radius:14px;padding:1.6rem 1.8rem;font-family:monospace;font-size:0.78rem;
-color:#64748b;line-height:1.9;overflow-x:auto;">
+<div style="background:#ffffff;border:1px solid #e0e7ff;border-radius:16px;
+padding:1.6rem 1.8rem;font-family:monospace;font-size:0.78rem;color:#475569;
+line-height:2;overflow-x:auto;">
 
-<span style="color:#8b5cf6;font-weight:700;">INGEST</span>
-&nbsp;&nbsp;&nbsp;Kafka / Redpanda&nbsp;&nbsp;→&nbsp;&nbsp;Avro + Schema Registry&nbsp;&nbsp;~1,400 events/s
-&nbsp;&nbsp;&nbsp;REST webhook&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→&nbsp;&nbsp;POST /ingest/webhook?source=shopify|woocommerce
-&nbsp;&nbsp;&nbsp;CSV upload&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→&nbsp;&nbsp;POST /ingest/csv
+<span style="color:#6366f1;font-weight:700;">INGEST</span>
+&nbsp;&nbsp; Kafka / Redpanda &nbsp;&rarr;&nbsp; Avro + Schema Registry &nbsp; ~1,400 events/s
+&nbsp;&nbsp; REST webhook &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr;&nbsp; POST /ingest/webhook?source=shopify|woocommerce
+&nbsp;&nbsp; CSV upload &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr;&nbsp; POST /ingest/csv
 
-<span style="color:#fb923c;font-weight:700;">BRONZE</span> &nbsp; s3://streamlake-bronze/events/{tenant}/
-&nbsp;&nbsp;&nbsp;Raw, immutable events in Delta Lake (delta-rs, no Spark)
-&nbsp;&nbsp;&nbsp;Partitioned by ingestion_date · idempotent consumer
+<span style="color:#f59e0b;font-weight:700;">BRONZE</span> &nbsp; s3://streamlake-bronze/events/{tenant}/
+&nbsp;&nbsp; Raw, immutable events in Delta Lake (delta-rs, no Spark)
+&nbsp;&nbsp; Partitioned by ingestion_date &middot; idempotent consumer
 
-<span style="color:#a78bfa;font-weight:700;">SILVER</span> &nbsp; s3://streamlake-silver/events/
-&nbsp;&nbsp;&nbsp;Event-time watermarks · LRU dedup (1h TTL)
-&nbsp;&nbsp;&nbsp;6 Great Expectations rules · quarantine side-output
+<span style="color:#8b5cf6;font-weight:700;">SILVER</span> &nbsp; s3://streamlake-silver/events/
+&nbsp;&nbsp; Event-time watermarks &middot; LRU dedup (1h TTL)
+&nbsp;&nbsp; 6 Great Expectations rules &middot; quarantine side-output
 
-<span style="color:#fbbf24;font-weight:700;">GOLD &nbsp;&nbsp;</span> s3://streamlake-gold/
-&nbsp;&nbsp;&nbsp;DuckDB aggregations: DAU, revenue, funnel, user_signals
+<span style="color:#10b981;font-weight:700;">GOLD &nbsp;</span> &nbsp; s3://streamlake-gold/
+&nbsp;&nbsp; DuckDB aggregations: DAU, revenue, funnel, user_signals
 
-<span style="color:#38bdf8;font-weight:700;">FEATURES</span> s3://streamlake-features/ + Redis (Feast online store)
-&nbsp;&nbsp;&nbsp;9 rolling features per user: purchases &amp; revenue over 1h / 24h / 7d
-&nbsp;&nbsp;&nbsp;Retrieved in &lt;10ms at inference time
+<span style="color:#06b6d4;font-weight:700;">FEATURES</span> s3://streamlake-features/ + Redis (Feast online store)
+&nbsp;&nbsp; 9 rolling features per user: purchases &amp; revenue over 1h / 24h / 7d
+&nbsp;&nbsp; Retrieved in &lt;10ms at inference time
 
-<span style="color:#00d4aa;font-weight:700;">SERVE</span>
-&nbsp;&nbsp;&nbsp;POST /predict&nbsp;&nbsp;→&nbsp;&nbsp;XGBoost · SHAP · 90/10 A/B split · Prometheus
-&nbsp;&nbsp;&nbsp;GET  /alerts&nbsp;&nbsp;&nbsp;→&nbsp;&nbsp;Redis sorted-set range query (O log N)
-&nbsp;&nbsp;&nbsp;GET  /metrics&nbsp;&nbsp;→&nbsp;&nbsp;Prometheus scrape · PSI drift detection
+<span style="color:#ef4444;font-weight:700;">SERVE</span>
+&nbsp;&nbsp; POST /predict &nbsp;&rarr;&nbsp; XGBoost &middot; SHAP &middot; 90/10 A/B split &middot; Prometheus
+&nbsp;&nbsp; GET  /alerts &nbsp;&nbsp;&rarr;&nbsp; Redis sorted-set range query (O log N)
 
 </div>
 """, unsafe_allow_html=True)
 
-    # ── Design decisions ──────────────────────────────────────────────────────
     st.markdown('<div class="section-hdr"><span>Key Design Decisions</span></div>',
                 unsafe_allow_html=True)
 
@@ -796,106 +853,106 @@ color:#64748b;line-height:1.9;overflow-x:auto;">
 
     with d1:
         st.markdown("""
-<div class="card">
-  <div style="color:#8b5cf6;font-size:0.7rem;font-weight:700;text-transform:uppercase;
-  letter-spacing:0.1em;margin-bottom:0.7rem;">Delta Lake on S3</div>
-  <div style="font-size:0.8rem;color:#94a3b8;line-height:1.7;">
-    Chose <strong style="color:#e2e8f0;">delta-rs</strong> (Rust) over PySpark so the
-    pipeline runs on a single machine with no JVM. ACID transactions and time-travel
-    come for free. Partitioning by <code style="color:#a78bfa;">ingestion_date</code>
-    keeps each query scanning only the relevant day's files.
+<div class="how-card">
+  <div class="how-icon"></div>
+  <div class="how-title" style="color:#f59e0b;">Delta Lake on S3</div>
+  <div class="how-body">
+    Chose <strong>delta-rs</strong> (Rust) over PySpark so the entire pipeline
+    runs on a single machine with no JVM overhead. ACID transactions and
+    time-travel come for free. Partitioning by <code>ingestion_date</code> ensures
+    each query scans only the relevant day's files.
   </div>
-</div>
-""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
 
     with d2:
         st.markdown("""
-<div class="card">
-  <div style="color:#06b6d4;font-size:0.7rem;font-weight:700;text-transform:uppercase;
-  letter-spacing:0.1em;margin-bottom:0.7rem;">Feast + Redis Feature Store</div>
-  <div style="font-size:0.8rem;color:#94a3b8;line-height:1.7;">
+<div class="how-card">
+  <div class="how-icon"></div>
+  <div class="how-title" style="color:#06b6d4;">Feast + Redis Feature Store</div>
+  <div class="how-body">
     Features are pre-computed in batch (Gold pipeline) and pushed to
-    <strong style="color:#e2e8f0;">Redis</strong> via Feast. The online store gives
-    sub-10ms feature retrieval at inference time without hitting S3.
-    The offline store (Delta) keeps a full history for retraining.
+    <strong>Redis</strong> via Feast. The online store gives sub-10ms retrieval
+    at inference time without touching S3. The offline Delta store keeps
+    full history for retraining.
   </div>
-</div>
-""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
 
     with d3:
         st.markdown("""
-<div class="card">
-  <div style="color:#00d4aa;font-size:0.7rem;font-weight:700;text-transform:uppercase;
-  letter-spacing:0.1em;margin-bottom:0.7rem;">SHAP + PSI Observability</div>
-  <div style="font-size:0.8rem;color:#94a3b8;line-height:1.7;">
-    Every prediction returns <strong style="color:#e2e8f0;">SHAP values</strong> so
-    the score is never a black box. Population Stability Index (PSI) is computed at
-    startup and pushed to Prometheus. PSI above 0.25 on any feature triggers a
-    drift alert without needing a separate ML platform.
+<div class="how-card">
+  <div class="how-icon"></div>
+  <div class="how-title" style="color:#10b981;">SHAP + PSI Observability</div>
+  <div class="how-body">
+    Every prediction returns <strong>SHAP values</strong> so the score is
+    never a black box. Population Stability Index (PSI) is computed at startup
+    and pushed to Prometheus. PSI above 0.25 on any feature triggers a drift
+    alert without a separate ML platform.
   </div>
-</div>
-""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
 
     d4, d5, d6 = st.columns(3)
 
     with d4:
         st.markdown("""
-<div class="card">
-  <div style="color:#fb923c;font-size:0.7rem;font-weight:700;text-transform:uppercase;
-  letter-spacing:0.1em;margin-bottom:0.7rem;">Multi-tenant API Keys</div>
-  <div style="font-size:0.8rem;color:#94a3b8;line-height:1.7;">
-    Each tenant authenticates with an <code style="color:#a78bfa;">X-Api-Key</code>
-    header. Ingested data lands under
-    <code style="color:#a78bfa;">{BRONZE_PATH}/{tenant_id}/</code> in S3 and churn
+<div class="how-card">
+  <div class="how-icon"></div>
+  <div class="how-title" style="color:#6366f1;">Multi-Tenant API Keys</div>
+  <div class="how-body">
+    Each tenant authenticates with an <code>X-Api-Key</code> header. Ingested
+    data lands under <code>{BRONZE_PATH}/{tenant_id}/</code> in S3 and churn
     scores are isolated in Redis under
-    <code style="color:#a78bfa;">streamlake:churn_scores:{tenant_id}</code>.
+    <code>streamlake:churn_scores:{tenant_id}</code>.
   </div>
-</div>
-""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
 
     with d5:
         st.markdown("""
-<div class="card">
-  <div style="color:#a78bfa;font-size:0.7rem;font-weight:700;text-transform:uppercase;
-  letter-spacing:0.1em;margin-bottom:0.7rem;">90 / 10 A/B Split</div>
-  <div style="font-size:0.8rem;color:#94a3b8;line-height:1.7;">
-    Each <code style="color:#a78bfa;">/predict</code> call hashes the
-    <code style="color:#a78bfa;">user_id</code> to assign champion (90%) or
-    challenger (10%) model deterministically. The same user always gets the same
-    model, making cohort analysis clean without a separate experiment platform.
+<div class="how-card">
+  <div class="how-icon"></div>
+  <div class="how-title" style="color:#8b5cf6;">90 / 10 A/B Split</div>
+  <div class="how-body">
+    Each <code>/predict</code> call hashes the <code>user_id</code> to assign
+    champion (90%) or challenger (10%) model deterministically. The same user
+    always gets the same model, making cohort analysis clean without a separate
+    experiment platform.
   </div>
-</div>
-""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
 
     with d6:
         st.markdown("""
-<div class="card">
-  <div style="color:#38bdf8;font-size:0.7rem;font-weight:700;text-transform:uppercase;
-  letter-spacing:0.1em;margin-bottom:0.7rem;">Fire-and-forget Webhooks</div>
-  <div style="font-size:0.8rem;color:#94a3b8;line-height:1.7;">
-    When churn probability exceeds the alert threshold,
-    <code style="color:#a78bfa;">/predict</code> fires an outbound webhook to the
-    caller's URL in a daemon thread. The response is never delayed waiting for
-    delivery, and failures are logged but never propagated.
+<div class="how-card">
+  <div class="how-icon"></div>
+  <div class="how-title" style="color:#ef4444;">Fire-and-Forget Webhooks</div>
+  <div class="how-body">
+    When churn probability exceeds the alert threshold, <code>/predict</code>
+    fires an outbound webhook to the caller's URL in a daemon thread. The
+    response is never delayed waiting for delivery, and failures are logged
+    but never propagated to the caller.
   </div>
-</div>
-""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
 
-    # ── Try the API ───────────────────────────────────────────────────────────
     st.markdown('<div class="section-hdr"><span>Try the API</span></div>',
                 unsafe_allow_html=True)
 
     api_col1, api_col2 = st.columns(2)
 
     with api_col1:
-        st.markdown("**Score a user**")
+        st.markdown(
+            '<div style="font-weight:700;color:#0f172a;font-size:0.88rem;'
+            'margin-bottom:0.5rem;">Score a customer</div>',
+            unsafe_allow_html=True,
+        )
         st.code(f"""curl -s -X POST {API_URL}/predict \\
   -H "Content-Type: application/json" \\
   -H "X-Api-Key: sk-demo-streamlake" \\
   -d '{{"user_id": "USER-006775"}}' \\
   | python3 -m json.tool""", language="bash")
 
-        st.markdown("**Push a Shopify webhook**")
+        st.markdown(
+            '<div style="font-weight:700;color:#0f172a;font-size:0.88rem;'
+            'margin:1rem 0 0.5rem;">Push a Shopify order</div>',
+            unsafe_allow_html=True,
+        )
         st.code(f"""curl -s -X POST \\
   "{API_URL}/ingest/webhook?source=shopify" \\
   -H "Content-Type: application/json" \\
@@ -910,13 +967,21 @@ color:#64748b;line-height:1.9;overflow-x:auto;">
   }}'""", language="bash")
 
     with api_col2:
-        st.markdown("**Get at-risk users**")
+        st.markdown(
+            '<div style="font-weight:700;color:#0f172a;font-size:0.88rem;'
+            'margin-bottom:0.5rem;">Get at-risk customers</div>',
+            unsafe_allow_html=True,
+        )
         st.code(f"""curl -s \\
   "{API_URL}/alerts?threshold=0.7&limit=10" \\
   -H "X-Api-Key: sk-demo-streamlake" \\
   | python3 -m json.tool""", language="bash")
 
-        st.markdown("**Upload a CSV**")
+        st.markdown(
+            '<div style="font-weight:700;color:#0f172a;font-size:0.88rem;'
+            'margin:1rem 0 0.5rem;">Upload a CSV</div>',
+            unsafe_allow_html=True,
+        )
         st.code(f"""curl -s -X POST {API_URL}/ingest/csv \\
   -H "X-Api-Key: sk-demo-streamlake" \\
   -F "file=@orders.csv"
@@ -925,19 +990,18 @@ color:#64748b;line-height:1.9;overflow-x:auto;">
 # order_id, customer_id, total_amount,
 # order_date, product_id, country""", language="bash")
 
-    # ── Data volumes ──────────────────────────────────────────────────────────
     st.markdown('<div class="section-hdr"><span>Data Volumes (full pipeline run)</span></div>',
                 unsafe_allow_html=True)
 
     v1, v2, v3, v4 = st.columns(4)
-    for col, label, val, sub, cls in [
-        (v1, "Bronze events",    "96,482",  "raw records",         "sub-orange"),
-        (v2, "Silver events",    "96,477",  "5 quarantined",       "sub-green"),
-        (v3, "Gold user signals","93,357",  "after dedup",         "sub-blue"),
-        (v4, "Feature store",    "93,357",  "users in Redis",      "sub-purple"),
+    for col, label, val, sub, cls, border in [
+        (v1, "Bronze events",     "96,482", "raw records",    "sa", "mi"),
+        (v2, "Silver events",     "96,477", "5 quarantined",  "se", "mv"),
+        (v3, "Gold user signals", "93,357", "after dedup",    "si", "me"),
+        (v4, "Feature store",     "93,357", "users in Redis", "sv", "ma"),
     ]:
         col.markdown(f"""
-<div class="card" style="text-align:center;">
+<div class="mcard {border}" style="text-align:center;">
   <div class="card-label">{label}</div>
   <div class="card-val">{val}</div>
   <div class="card-sub {cls}">{sub}</div>
