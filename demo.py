@@ -214,8 +214,24 @@ def load_delta(path: str) -> pd.DataFrame:
     return DeltaTable(path, storage_options=STORAGE_OPTIONS).to_pandas()
 
 @st.cache_data(ttl=30)
-def load_features() -> pd.DataFrame:
-    return pd.read_parquet("feature_store/data/user_features.parquet")
+@st.cache_data(ttl=3600, show_spinner=False)
+def _load_user_ids() -> list[str]:
+    """Return unique user IDs from S3 Silver Delta (cached 1h, column-only read)."""
+    _so = {k: v for k, v in {
+        "AWS_ACCESS_KEY_ID":          os.getenv("AWS_ACCESS_KEY_ID", ""),
+        "AWS_SECRET_ACCESS_KEY":      os.getenv("AWS_SECRET_ACCESS_KEY", ""),
+        "AWS_REGION":                 os.getenv("AWS_DEFAULT_REGION", "us-east-2"),
+        "AWS_S3_ALLOW_UNSAFE_RENAME": "true",
+    }.items() if v}
+    ep = os.getenv("AWS_ENDPOINT_URL", "")
+    if ep:
+        _so["AWS_ENDPOINT_URL"] = ep
+    from deltalake import DeltaTable
+    df = DeltaTable(
+        os.getenv("DELTA_SILVER_PATH", "s3://streamlake-silver/events"),
+        storage_options=_so,
+    ).to_pandas()
+    return df["user_id"].unique().tolist()
 
 def check_svc(url: str, timeout: float = 5.0) -> bool:
     try:
@@ -411,17 +427,16 @@ with tab1:
 
     with c3:
         try:
-            fdf        = load_features()
-            purchasers = (fdf["purchase_count_24h"] > 0).sum()
+            uids = _load_user_ids()
             c3.markdown(f"""<div class="mcard me">
                 <div class="card-label">Feature Store Users</div>
-                <div class="card-val">{len(fdf):,}</div>
-                <div class="card-sub si">{purchasers:,} purchased today</div>
+                <div class="card-val">{len(uids):,}</div>
+                <div class="card-sub si">unique users in Redis</div>
             </div>""", unsafe_allow_html=True)
         except Exception:
             c3.markdown('<div class="mcard me"><div class="card-label">Feature Store</div>'
                         '<div class="card-val">--</div>'
-                        '<div class="card-sub sm">run feature_pipeline</div></div>',
+                        '<div class="card-sub sm">S3 unavailable</div></div>',
                         unsafe_allow_html=True)
 
     with c4:
@@ -573,11 +588,11 @@ padding:1rem 1.3rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12p
     with col_rnd:
         if st.button("Random user", use_container_width=True):
             try:
-                fdf = load_features()
-                st.session_state["rand_user"] = random.choice(fdf["user_id"].tolist())
+                uids = _load_user_ids()
+                st.session_state["rand_user"] = random.choice(uids)
                 st.rerun()
             except Exception:
-                st.warning("Feature store not ready.")
+                st.warning("Could not load users from S3.")
 
     if "rand_user" in st.session_state:
         user_id = st.session_state.pop("rand_user")
