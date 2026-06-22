@@ -213,15 +213,6 @@ def load_delta(path: str) -> pd.DataFrame:
     from deltalake import DeltaTable
     return DeltaTable(path, storage_options=STORAGE_OPTIONS).to_pandas()
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def _load_user_ids() -> list[str]:
-    """Return unique user IDs from S3 Silver Delta (cached 1h)."""
-    from deltalake import DeltaTable
-    df = DeltaTable(
-        os.getenv("DELTA_SILVER_PATH", "s3://streamlake-silver/events"),
-        storage_options=STORAGE_OPTIONS,
-    ).to_pandas()
-    return df["user_id"].unique().tolist()
 
 def check_svc(url: str, timeout: float = 5.0) -> bool:
     try:
@@ -417,10 +408,11 @@ with tab1:
 
     with c3:
         try:
-            uids = _load_user_ids()
+            _sv = load_delta("s3://streamlake-silver/events")
+            uid_count = _sv["user_id"].nunique()
             c3.markdown(f"""<div class="mcard me">
                 <div class="card-label">Feature Store Users</div>
-                <div class="card-val">{len(uids):,}</div>
+                <div class="card-val">{uid_count:,}</div>
                 <div class="card-sub si">unique users in Redis</div>
             </div>""", unsafe_allow_html=True)
         except Exception:
@@ -582,8 +574,8 @@ padding:1rem 1.3rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12p
     with col_rnd:
         if st.button("Random user", use_container_width=True):
             try:
-                uids = _load_user_ids()
-                st.session_state["uid_input"] = random.choice(uids)
+                _sv = load_delta("s3://streamlake-silver/events")
+                st.session_state["uid_input"] = random.choice(_sv["user_id"].unique().tolist())
                 st.session_state["_auto_predict"] = True
                 st.rerun()
             except Exception:
@@ -871,7 +863,7 @@ margin-bottom:1rem;">
             legend=dict(orientation="h", x=0.5, xanchor="center", y=1.08,
                         font=dict(color="#475569")),
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
         st.markdown('<div class="section-hdr"><span>Feature Detail</span></div>',
                     unsafe_allow_html=True)
