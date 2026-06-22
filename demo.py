@@ -561,6 +561,30 @@ padding:1rem 1.3rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12p
 </div>
 """, unsafe_allow_html=True)
 
+    _SAMPLE_USERS = [
+        "063342fa545494715cc59f983598c546","4964b30e0f0fd6fe49698ee0f5f4fb03",
+        "553f3ea5d1e743cd91146d3d06e944f0","1bbe92403f551af2702ed4bbd3c60f63",
+        "036f41292af402f38e6ed17bacd3e174","8151b2504242ea64b463eed43288422b",
+        "615cdbd1d5344e00731595b46e6f211a","cbdc49dbd5ebf262ca92695c653a53b7",
+        "ca0a764300b58f2eef1726377e8e2766","287de6b37e84b6042b32e6f4c665fb4e",
+        "2e002c27ac2b7f8ca51cb8c4ccef272b","f5374a3252629ff1494472bb4b2bf68c",
+        "d08c29302907086e8fe823369542f3ae","60de4491ffb20042d1970c993b5b3726",
+        "5da306ece745a9311ebcb7ea06ebc166","b9186cea0c4fc102347b239240c75f6e",
+        "853254c35b5ee150b4da2b3698d73f9e","930b47df55f7281c598c908585ae7435",
+        "2c84f1599c2cbebed0b8fa6cadf82003","b51e5231c8ece4e6f463f2add2e07f60",
+        "f76b64c64d5c95d10ec203542b2f827c","a6d657af9fb3441e21a6d4cf7054e165",
+        "553d4ddf98f0c04aa7e4a938826eb335","73f114d20e161efe2a16cea9855bd2be",
+        "9ed4f2771274a984af927b83258e68fe","13d28dd6d0480c493b3607c61b0a0160",
+        "ea19a5a33e1c56d4dee6364cda4064e2","818a621cfb53334cdca627e59f0eaa65",
+        "6cf62f27f789c57b96c1351cd5036e2d","9b889b803152464fc0a74d91c5cd50bd",
+    ]
+
+    # Apply a pending random user BEFORE the text_input widget renders.
+    # Setting st.session_state[key] after a widget with that key has rendered
+    # throws StreamlitAPIException, so we stage through "_pending_uid" instead.
+    if "_pending_uid" in st.session_state:
+        st.session_state["uid_input"] = st.session_state.pop("_pending_uid")
+
     if "uid_input" not in st.session_state:
         st.session_state["uid_input"] = "USER-006775"
 
@@ -573,29 +597,12 @@ padding:1rem 1.3rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12p
         go_btn = st.button("Predict churn", type="primary", use_container_width=True)
     with col_rnd:
         if st.button("Random user", use_container_width=True):
-            _SAMPLE_USERS = [
-                "063342fa545494715cc59f983598c546","4964b30e0f0fd6fe49698ee0f5f4fb03",
-                "553f3ea5d1e743cd91146d3d06e944f0","1bbe92403f551af2702ed4bbd3c60f63",
-                "036f41292af402f38e6ed17bacd3e174","8151b2504242ea64b463eed43288422b",
-                "615cdbd1d5344e00731595b46e6f211a","cbdc49dbd5ebf262ca92695c653a53b7",
-                "ca0a764300b58f2eef1726377e8e2766","287de6b37e84b6042b32e6f4c665fb4e",
-                "2e002c27ac2b7f8ca51cb8c4ccef272b","f5374a3252629ff1494472bb4b2bf68c",
-                "d08c29302907086e8fe823369542f3ae","60de4491ffb20042d1970c993b5b3726",
-                "5da306ece745a9311ebcb7ea06ebc166","b9186cea0c4fc102347b239240c75f6e",
-                "853254c35b5ee150b4da2b3698d73f9e","930b47df55f7281c598c908585ae7435",
-                "2c84f1599c2cbebed0b8fa6cadf82003","b51e5231c8ece4e6f463f2add2e07f60",
-                "f76b64c64d5c95d10ec203542b2f827c","a6d657af9fb3441e21a6d4cf7054e165",
-                "553d4ddf98f0c04aa7e4a938826eb335","73f114d20e161efe2a16cea9855bd2be",
-                "9ed4f2771274a984af927b83258e68fe","13d28dd6d0480c493b3607c61b0a0160",
-                "ea19a5a33e1c56d4dee6364cda4064e2","818a621cfb53334cdca627e59f0eaa65",
-                "6cf62f27f789c57b96c1351cd5036e2d","9b889b803152464fc0a74d91c5cd50bd",
-            ]
             try:
                 _sv = load_delta("s3://streamlake-silver/events")
                 uids = _sv["user_id"].unique().tolist()
             except Exception:
                 uids = _SAMPLE_USERS
-            st.session_state["uid_input"] = random.choice(uids)
+            st.session_state["_pending_uid"] = random.choice(uids)
             st.session_state["_auto_predict"] = True
             st.rerun()
 
