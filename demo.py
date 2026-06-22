@@ -360,6 +360,14 @@ border-radius:24px;padding:2.6rem 2.8rem;margin:1.5rem 0 1.8rem;position:relativ
 """, unsafe_allow_html=True)
 
 
+# ── Drift report (cached — reads S3 Silver Delta once per 5 min) ─────────────
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _cached_drift_report() -> dict:
+    from serving.drift_monitor import compute_drift_report
+    return compute_drift_report()
+
+
 # ── Tabs ─────────────────────────────────────────────────────────────────────
 
 tab1, tab2, tab3, tab4 = st.tabs(["Pipeline", "Predict", "Drift Monitor", "How it works"])
@@ -723,8 +731,7 @@ display:flex;gap:14px;align-items:flex-start;margin-bottom:1.5rem;">
 """, unsafe_allow_html=True)
 
     try:
-        from serving.drift_monitor import compute_drift_report
-        report = compute_drift_report()
+        report = _cached_drift_report()
 
         # Status banner
         if report["drift_alert"]:
