@@ -619,6 +619,8 @@ padding:1rem 1.3rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12p
         else:
             data = resp.json()
             prob = data["churn_probability"]
+            mv   = data["model_version"]
+            mv_label = mv if mv == "file" else f"v{mv}"
 
             st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
@@ -639,7 +641,7 @@ padding:1rem 1.3rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12p
       <div style="font-size:0.62rem;color:#94a3b8;text-transform:uppercase;
       letter-spacing:0.1em;margin-bottom:2px;">Model</div>
       <div style="font-size:0.82rem;color:#6366f1;font-weight:700;">
-        v{data['model_version']}</div>
+        {mv_label}</div>
     </div>
     <div style="width:1px;background:#e0e7ff;"></div>
     <div style="text-align:center;">
@@ -680,7 +682,8 @@ padding:1rem 1.3rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12p
                     yaxis={"autorange": "reversed", "tickfont": {"size": 11, "color": "#475569"}},
                     xaxis={"zeroline": True, "zerolinecolor": "#c7d2fe", "zerolinewidth": 1.5},
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True,
+                                config={"displayModeBar": False})
 
             with r3:
                 st.markdown(
@@ -729,7 +732,7 @@ padding:1rem 1.3rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12p
                         "line": {"color": "#6366f1", "width": 2}, "value": 50
                     },
                 },
-                title={"text": f"Risk score for {user_id}",
+                title={"text": f"Risk score — {user_id[:12]}{'...' if len(user_id) > 12 else ''}",
                        "font": {"color": "#64748b", "size": 13}},
             ))
             fig_g.update_layout(
@@ -737,7 +740,8 @@ padding:1rem 1.3rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12p
                 font=dict(family="Inter", color="#475569"),
                 height=250, margin=dict(t=40, b=0, l=30, r=30),
             )
-            st.plotly_chart(fig_g, use_container_width=True)
+            st.plotly_chart(fig_g, use_container_width=True,
+                            config={"displayModeBar": False})
 
 
 # =============================================================================
