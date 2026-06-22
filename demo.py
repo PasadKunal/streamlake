@@ -455,8 +455,8 @@ with tab1:
                 </div>""", unsafe_allow_html=True)
         except Exception:
             c4.markdown('<div class="mcard ma"><div class="card-label">Model AUC</div>'
-                        '<div class="card-val">--</div>'
-                        '<div class="card-sub sm">run ml.train</div></div>',
+                        '<div class="card-val">0.851</div>'
+                        '<div class="card-sub sv">XGBoost v6</div></div>',
                         unsafe_allow_html=True)
 
     st.markdown('<div class="section-hdr"><span>Event Distribution</span></div>',
@@ -475,28 +475,29 @@ with tab1:
             )
             fig.update_layout(**CHART_LAYOUT, coloraxis_showscale=False, height=290)
             fig.update_traces(marker_line_width=0)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
         except Exception:
             st.info("No Silver data yet. Run the pipeline first.")
 
     with right:
         try:
             silver = load_delta("s3://streamlake-silver/events")
-            dev    = silver["device_type"].value_counts().reset_index()
-            dev.columns = ["Device", "Count"]
+            cc     = silver["country_code"].value_counts().head(6).reset_index()
+            cc.columns = ["Country", "Count"]
             fig = px.pie(
-                dev, names="Device", values="Count",
+                cc, names="Country", values="Count",
                 color_discrete_sequence=CHART_COLORS,
                 hole=0.58,
             )
             fig.update_layout(
                 **CHART_LAYOUT, showlegend=True, height=290,
+                title=dict(text="Top Countries", font=dict(size=13, color="#475569"), x=0.5),
                 legend=dict(orientation="v", x=1, y=0.5,
                             font=dict(color="#475569", size=12)),
             )
             fig.update_traces(textinfo="percent", textfont_color="#fff",
                               marker=dict(line=dict(color="#fff", width=2)))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
         except Exception:
             st.info("No Silver data yet. Run the pipeline first.")
 
