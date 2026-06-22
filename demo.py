@@ -213,23 +213,13 @@ def load_delta(path: str) -> pd.DataFrame:
     from deltalake import DeltaTable
     return DeltaTable(path, storage_options=STORAGE_OPTIONS).to_pandas()
 
-@st.cache_data(ttl=30)
 @st.cache_data(ttl=3600, show_spinner=False)
 def _load_user_ids() -> list[str]:
-    """Return unique user IDs from S3 Silver Delta (cached 1h, column-only read)."""
-    _so = {k: v for k, v in {
-        "AWS_ACCESS_KEY_ID":          os.getenv("AWS_ACCESS_KEY_ID", ""),
-        "AWS_SECRET_ACCESS_KEY":      os.getenv("AWS_SECRET_ACCESS_KEY", ""),
-        "AWS_REGION":                 os.getenv("AWS_DEFAULT_REGION", "us-east-2"),
-        "AWS_S3_ALLOW_UNSAFE_RENAME": "true",
-    }.items() if v}
-    ep = os.getenv("AWS_ENDPOINT_URL", "")
-    if ep:
-        _so["AWS_ENDPOINT_URL"] = ep
+    """Return unique user IDs from S3 Silver Delta (cached 1h)."""
     from deltalake import DeltaTable
     df = DeltaTable(
         os.getenv("DELTA_SILVER_PATH", "s3://streamlake-silver/events"),
-        storage_options=_so,
+        storage_options=STORAGE_OPTIONS,
     ).to_pandas()
     return df["user_id"].unique().tolist()
 
@@ -483,6 +473,8 @@ with tab1:
         try:
             silver = load_delta("s3://streamlake-silver/events")
             amt = silver["amount_cents"].dropna()
+            cap = amt.quantile(0.99)
+            amt = amt[amt <= cap]
             fig = px.histogram(
                 amt, x=amt, nbins=40,
                 color_discrete_sequence=["#8b5cf6"],
@@ -490,7 +482,7 @@ with tab1:
             fig.update_layout(
                 **CHART_LAYOUT, height=290,
                 xaxis_title="Amount (cents)", yaxis_title="Orders",
-                title=dict(text="Purchase Amount Distribution",
+                title=dict(text="Purchase Amount Distribution (p99)",
                            font=dict(size=13, color="#475569"), x=0.5),
                 bargap=0.05,
             )
