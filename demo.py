@@ -488,33 +488,60 @@ with tab1:
     st.markdown('<div class="section-hdr"><span>Data Flow</span></div>',
                 unsafe_allow_html=True)
 
-    st.code("""\
-INGEST   Kafka / Redpanda  ->  Avro + Schema Registry   ~1,400 events/s
-         REST Webhook       ->  POST /ingest/webhook (Shopify / WooCommerce)
-         CSV Upload         ->  POST /ingest/csv
-              |
-              v
-BRONZE   s3://streamlake-bronze/events/   raw, immutable, partitioned by date
-         Delta Lake (delta-rs)  ·  idempotent consumer  ·  at-least-once delivery
-              |
-              v  watermark / dedup / Great Expectations / quarantine router
-SILVER   s3://streamlake-silver/events/   validated, deduplicated
-         Event-time watermarks  ·  LRU dedup 1h TTL  ·  6 GE rules
-              |
-         -----+---------------------
-         |                         |
-         v                         v
-GOLD     DuckDB aggregations    FEATURES  Feast 0.39 -> Redis online store
-         DAU / Revenue / Funnel           9 rolling features per user
-         user_signals table               purchases & revenue 1h / 24h / 7d
-                                          Retrieved in <10ms at inference time
-                                    |
-                                    v
-                             XGBoost /predict
-                             SHAP explanations  ·  90/10 A/B split
-                             Prometheus metrics  ·  PSI drift detection
-                             GET /alerts  ->  Redis sorted-set O(log N)
-""", language="text")
+    def _flow_card(color, border_color, label, path, bullets):
+        items = "".join(
+            f'<li style="margin:2px 0;color:#64748b;">{b}</li>' for b in bullets
+        )
+        return (
+            f'<div style="flex:1;min-width:155px;background:#ffffff;border:1px solid {border_color};'
+            f'border-top:3px solid {color};border-radius:12px;padding:0.85rem 1rem;">'
+            f'<div style="font-size:0.58rem;font-weight:800;color:{color};text-transform:uppercase;'
+            f'letter-spacing:0.12em;margin-bottom:0.2rem;">{label}</div>'
+            f'<div style="font-size:0.63rem;color:#94a3b8;font-family:monospace;'
+            f'margin-bottom:0.5rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+            f'{path}</div>'
+            f'<ul style="margin:0;padding-left:1rem;font-size:0.7rem;line-height:1.8;">{items}</ul>'
+            f'</div>'
+        )
+
+    _arrow = ('<div style="display:flex;align-items:center;padding:0 5px;flex-shrink:0;'
+              'color:#c7d2fe;font-size:1.1rem;">&#8594;</div>')
+
+    st.markdown(
+        '<div style="display:flex;align-items:stretch;gap:0;overflow-x:auto;padding-bottom:4px;">'
+        + _flow_card("#6366f1", "#c7d2fe", "Ingest", "Kafka / REST / CSV", [
+            "Kafka &middot; Redpanda",
+            "POST /ingest/webhook",
+            "POST /ingest/csv",
+            "~1,400 events / s",
+        ])
+        + _arrow
+        + _flow_card("#f59e0b", "#fde68a", "Bronze", "s3://streamlake-bronze/", [
+            "Delta Lake (delta-rs)",
+            "Partitioned by date",
+            "Idempotent &middot; at-least-once",
+        ])
+        + _arrow
+        + _flow_card("#8b5cf6", "#ddd6fe", "Silver", "s3://streamlake-silver/", [
+            "Event-time watermarks",
+            "LRU dedup &middot; 1h TTL",
+            "6 GE validation rules",
+        ])
+        + _arrow
+        + _flow_card("#06b6d4", "#a5f3fc", "Features", "s3://streamlake-features/ + Redis", [
+            "Feast 0.39 + Redis",
+            "9 rolling features",
+            "&lt;10ms at inference",
+        ])
+        + _arrow
+        + _flow_card("#ef4444", "#fecaca", "Serve", "streamlake.onrender.com", [
+            "XGBoost &middot; SHAP",
+            "90/10 A/B split",
+            "PSI drift &middot; /alerts",
+        ])
+        + '</div>',
+        unsafe_allow_html=True,
+    )
 
 
 # =============================================================================
