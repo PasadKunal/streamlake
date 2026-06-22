@@ -686,14 +686,15 @@ padding:1rem 1.3rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12p
                     text=[f"{v:+.3f}" for v in shap_df["shap_value"]],
                     textposition="outside",
                     textfont=dict(color="#475569", size=11),
+                    cliponaxis=False,
                 ))
                 fig.update_layout(
                     **CHART_LAYOUT, height=210,
                     xaxis_title="SHAP value",
                     yaxis={"autorange": "reversed", "tickfont": {"size": 11, "color": "#475569"}},
                     xaxis={"zeroline": True, "zerolinecolor": "#c7d2fe", "zerolinewidth": 1.5},
-                    margin_r=60,
                 )
+                fig.update_layout(margin_r=65, margin_l=10)
                 st.plotly_chart(fig, use_container_width=True,
                                 config={"displayModeBar": False})
 
