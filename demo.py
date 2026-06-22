@@ -482,21 +482,19 @@ with tab1:
     with right:
         try:
             silver = load_delta("s3://streamlake-silver/events")
-            cc     = silver["country_code"].value_counts().head(6).reset_index()
-            cc.columns = ["Country", "Count"]
-            fig = px.pie(
-                cc, names="Country", values="Count",
-                color_discrete_sequence=CHART_COLORS,
-                hole=0.58,
+            amt = silver["amount_cents"].dropna()
+            fig = px.histogram(
+                amt, x=amt, nbins=40,
+                color_discrete_sequence=["#8b5cf6"],
             )
             fig.update_layout(
-                **CHART_LAYOUT, showlegend=True, height=290,
-                title=dict(text="Top Countries", font=dict(size=13, color="#475569"), x=0.5),
-                legend=dict(orientation="v", x=1, y=0.5,
-                            font=dict(color="#475569", size=12)),
+                **CHART_LAYOUT, height=290,
+                xaxis_title="Amount (cents)", yaxis_title="Orders",
+                title=dict(text="Purchase Amount Distribution",
+                           font=dict(size=13, color="#475569"), x=0.5),
+                bargap=0.05,
             )
-            fig.update_traces(textinfo="percent", textfont_color="#fff",
-                              marker=dict(line=dict(color="#fff", width=2)))
+            fig.update_traces(marker_line_width=0)
             st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
         except Exception:
             st.info("No Silver data yet. Run the pipeline first.")
@@ -579,9 +577,12 @@ padding:1rem 1.3rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12p
 </div>
 """, unsafe_allow_html=True)
 
+    if "uid_input" not in st.session_state:
+        st.session_state["uid_input"] = "USER-006775"
+
     col_in, col_btn, col_rnd = st.columns([4, 2, 2])
     with col_in:
-        user_id = st.text_input("User ID", value="USER-006775",
+        user_id = st.text_input("User ID", key="uid_input",
                                 placeholder="e.g. USER-006775",
                                 label_visibility="collapsed")
     with col_btn:
@@ -590,14 +591,14 @@ padding:1rem 1.3rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12p
         if st.button("Random user", use_container_width=True):
             try:
                 uids = _load_user_ids()
-                st.session_state["rand_user"] = random.choice(uids)
+                st.session_state["uid_input"] = random.choice(uids)
+                st.session_state["_auto_predict"] = True
                 st.rerun()
             except Exception:
                 st.warning("Could not load users from S3.")
 
-    if "rand_user" in st.session_state:
-        user_id = st.session_state.pop("rand_user")
-        go_btn  = True
+    if st.session_state.pop("_auto_predict", False):
+        go_btn = True
 
     if go_btn:
         with st.spinner("Scoring customer... (first call may take ~30s to wake API)"):
