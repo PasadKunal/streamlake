@@ -692,6 +692,7 @@ padding:1rem 1.3rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12p
                     xaxis_title="SHAP value",
                     yaxis={"autorange": "reversed", "tickfont": {"size": 11, "color": "#475569"}},
                     xaxis={"zeroline": True, "zerolinecolor": "#c7d2fe", "zerolinewidth": 1.5},
+                    margin=dict(r=60),
                 )
                 st.plotly_chart(fig, use_container_width=True,
                                 config={"displayModeBar": False})
